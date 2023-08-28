@@ -1,0 +1,24 @@
+{
+    "GitHubToken": "PlaceYourTokenHere",
+    "TargetRepository": "user/repository",
+    "TargetBranch": "master",
+    "ItemNumbers": [
+        1234
+    ],
+    "CommitDetailsToShow": {
+        "Message": true,
+        "ItemNumber": true,
+        "Author": false,
+        "Date": false,
+        "CommitUrl": true,
+        "PullRequestUrl": false,
+        "Sha": true
+    },
+    "GroupCommitsByItem": true,
+    "ShowCommitsInDateDescendingOrder": false,
+    "UseCommitHistory": false,
+    "UsePullRequests": true,
+    "OutputToTerminal": false,
+    "OutputToTxtFile": true,
+    "OutputToExcelFile": true
+}
