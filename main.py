@@ -206,7 +206,7 @@ if use_commit_history:
             save_commit_info(commit, item_number, pr_urls=pr_urls)
 
 if use_pull_requests:
-    for pull in repo.get_pulls(state="closed", base="Develop"):
+    for pull in repo.get_pulls(state="closed", base=target_branch_name):
         matches = [item_number for item_number in item_numbers if(item_number in pull.head.ref)]
         if len(matches) > 0:
             if output_to_terminal:
