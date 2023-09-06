@@ -18,7 +18,8 @@
     "ShowCommitsInDateDescendingOrder": false,
     "UseCommitHistory": false,
     "UsePullRequests": true,
-    "OutputToTerminal": false,
+    "OutputToTerminal": true,
     "OutputToTxtFile": true,
-    "OutputToExcelFile": true
+    "OutputToExcelFile": true,
+    "ShowCherryPickCommand": true
 }
