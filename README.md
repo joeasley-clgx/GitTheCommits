@@ -53,6 +53,8 @@ If `true`, prints the output to the terminal.
 If `true`, writes the output to a text file (text is the same as what's printed to the terminal.
 6. OutputToExcelFile -
 If `true`, writes the output to an excel file.
+7. ShowCherryPickCommand -
+If `true`, writes a git cherry-pick command for all the found commits to any enabled output.
 
 Once you've finalized your settings, run `main.py`, kick back, relax, grab some popcorn, then realize you don't have time to make popcorn because the results are in!
 
