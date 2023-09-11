@@ -6,7 +6,7 @@ import re
 import xlsxwriter
 
 
-def group_relevant_commit_info(git_commit: GitCommit.GitCommit, item_number: str | int, pr_urls: tuple = None, pr_url: str = None) -> object:
+def group_relevant_commit_info(git_commit: GitCommit.GitCommit, item_number, pr_urls: tuple = None, pr_url: str = None) -> object:
     # Condenses all the info from a commit into just the information we need and in a format we can use 
 
     return {
