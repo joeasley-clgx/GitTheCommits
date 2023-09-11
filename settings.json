@@ -8,18 +8,20 @@
     "CommitDetailsToShow": {
         "Message": true,
         "ItemNumber": true,
-        "Author": false,
-        "Date": false,
-        "CommitUrl": true,
-        "PullRequestUrl": false,
-        "Sha": true
+        "Author": true,
+        "Date": true,
+        "CommitUrl": false,
+        "PullRequestUrl": true,
+        "Sha": true,
+        "IsMergeCommit": false
     },
-    "GroupCommitsByItem": true,
+    "GroupCommitsByItem": false,
     "ShowCommitsInDateDescendingOrder": false,
     "UseCommitHistory": false,
     "UsePullRequests": true,
     "OutputToTerminal": true,
     "OutputToTxtFile": true,
     "OutputToExcelFile": true,
-    "ShowCherryPickCommand": true
+    "ShowCherryPickCommand": true,
+    "IgnoreMergeCommits": true
 }

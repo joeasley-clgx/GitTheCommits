@@ -17,6 +17,7 @@ def group_relevant_commit_info(git_commit: GitCommit.GitCommit, item_number, pr_
         "commit url": git_commit.html_url,
         "pr url": pr_url if pr_url != None else (", ".join(pr_urls) if pr_urls != None else "None"),
         "item number": f"CLCTUTD-{str(item_number)}",
+        "is merge": len(git_commit.parents) > 1
     }
 
 
@@ -25,14 +26,18 @@ def save_commit_info(commit: GitCommit.GitCommit, item_number: str, pr_urls: tup
 
     global commit_list
     global item_commit_dictionary
+    global ignore_merge_commits
 
     if not commit.sha in [commit['sha'] for commit in commit_list]:
-        commit_list.append(group_relevant_commit_info(commit, item_number, pr_urls, pr_url))
+        commit_info = group_relevant_commit_info(commit, item_number, pr_urls, pr_url)
+
+        if not ignore_merge_commits or not commit_info['is merge']:
+            commit_list.append(commit_info)
             
-        if item_number in item_commit_dictionary:
-            item_commit_dictionary[item_number].append(len(commit_list) - 1)
-        else:
-            item_commit_dictionary[item_number] = [len(commit_list) - 1]
+            if item_number in item_commit_dictionary:
+                item_commit_dictionary[item_number].append(len(commit_list) - 1)
+            else:
+                item_commit_dictionary[item_number] = [len(commit_list) - 1]
 
 
 def stringify_commits(commit_list: list) -> str:
@@ -49,6 +54,7 @@ def stringify_commits(commit_list: list) -> str:
         if commit_detail_visibilty["CommitUrl"]: output += f"\nCommit URL: {commit['commit url']}"
         if commit_detail_visibilty["PullRequestUrl"]: output += f"\nPull Request URL: {commit['pr url']}"
         if commit_detail_visibilty["Sha"]: output += f"\nSHA: {commit['sha']}"
+        if commit_detail_visibilty["IsMergeCommit"]: output += f"\nIs Merge Commit: {commit['is merge']}"
         output += "\n"
         
     return output
@@ -73,6 +79,9 @@ def manually_enter_item_numbers() -> list:
 
 def generate_excel_file(commit_list: list) -> None:
     # Make xlsx file
+
+    global cherry_pick_command
+
     # xlsxwriter package cannot overwrite files
     if os.path.isfile(f"output.xlsx"):
         os.remove(f"output.xlsx")
@@ -91,7 +100,8 @@ def generate_excel_file(commit_list: list) -> None:
             4: 'D',
             5: 'E',
             6: 'F',
-            7: 'G'
+            7: 'G',
+            8: 'H'
         }
 
         # Header Rows
@@ -131,6 +141,11 @@ def generate_excel_file(commit_list: list) -> None:
             worksheet.set_column(f"{letter}:{letter}", 42)
             worksheet.write_string(f'{letter}1', "Sha", header_format)
             header_column_number += 1
+        if commit_detail_visibilty["IsMergeCommit"]: 
+            letter = letter_dictionary[header_column_number]
+            worksheet.set_column(f"{letter}:{letter}", 42)
+            worksheet.write_string(f'{letter}1', "Is Merge Commit", header_format)
+            header_column_number += 1
 
         # THE DATA
         row = 1
@@ -157,12 +172,15 @@ def generate_excel_file(commit_list: list) -> None:
             if commit_detail_visibilty["Sha"]:
                 worksheet.write_string(row, data_column_number, commit['sha'], centered_data_format) 
                 data_column_number += 1
+            if commit_detail_visibilty["IsMergeCommit"]:
+                worksheet.write_string(row, data_column_number, str(commit['is merge']), centered_data_format) 
+                data_column_number += 1
             
             row += 1
         
         if show_cherry_pick_command:
             worksheet.merge_range(f"A{row + 2}:{letter_dictionary[header_column_number]}{row + 2}", 
-                                  f"\ngit cherry-pick {' '.join([commit['sha'][:7] for commit in commit_list])}", data_format)
+                                  f"\n{cherry_pick_command}{' '.join([commit['sha'][:7] for commit in commit_list])}", data_format)
 
 
 if __name__ == "__main__":
@@ -192,6 +210,8 @@ if __name__ == "__main__":
         output_to_excel = settings["OutputToExcelFile"]
         # Show the git cherry-pick command to the end of the output
         show_cherry_pick_command = settings["ShowCherryPickCommand"]
+        # If a commit has more than one parent, it will be excluded (Use case, ignore "merge develop to feature branch" commits)
+        ignore_merge_commits = settings["IgnoreMergeCommits"]
 
     if len(item_numbers) == 0:
         item_numbers = manually_enter_item_numbers()
@@ -247,6 +267,8 @@ if __name__ == "__main__":
     total_output = ""
     output = f"Found {len(commit_list)} related commit{'' if len(commit_list) == 1 else 's'}"
 
+    cherry_pick_command = f"git cherry-pick -n --strategy=recursive -X theirs {'-m 1 ' if not ignore_merge_commits else ''}"
+
     if output_to_terminal:
         print("\n" + output)
     if output_to_txt:
@@ -283,7 +305,7 @@ if __name__ == "__main__":
 
         
         if show_cherry_pick_command and (output_to_terminal or output_to_txt):
-            output = f"\ngit cherry-pick {' '.join([commit['sha'][:7] for commit in commit_list])}"
+            output = f"\n{cherry_pick_command}{' '.join([commit['sha'][:7] for commit in sorted_commit_list])}"
 
             if output_to_terminal:
                 print(output)
@@ -304,7 +326,7 @@ if __name__ == "__main__":
             output += stringify_commits(sorted_commit_list)
             
             if show_cherry_pick_command:
-                output += f"\ngit cherry-pick {' '.join([commit['sha'][:7] for commit in commit_list])}"
+                output += f"\n{cherry_pick_command}{' '.join([commit['sha'][:7] for commit in sorted_commit_list])}"
 
             if output_to_terminal:
                 print(output)
@@ -314,4 +336,8 @@ if __name__ == "__main__":
     if output_to_txt:
         with open("output.txt", 'w') as file:
             file.write(total_output)
+    
+    if output_to_terminal:
+        # Do not immediately close program
+        input()
         
