@@ -162,7 +162,7 @@ def generate_excel_file(commit_list: list) -> None:
         
         if show_cherry_pick_command:
             worksheet.merge_range(f"A{row + 2}:{letter_dictionary[header_column_number]}{row + 2}", 
-                                  f"\ngit cherry-pick {' '.join([commit['sha'] for commit in commit_list])}", data_format)
+                                  f"\ngit cherry-pick {' '.join([commit['sha'][:7] for commit in commit_list])}", data_format)
 
 
 if __name__ == "__main__":
@@ -283,7 +283,7 @@ if __name__ == "__main__":
 
         
         if show_cherry_pick_command and (output_to_terminal or output_to_txt):
-            output = f"\ngit cherry-pick {' '.join([commit['sha'] for commit in commit_list])}"
+            output = f"\ngit cherry-pick {' '.join([commit['sha'][:7] for commit in commit_list])}"
 
             if output_to_terminal:
                 print(output)
@@ -304,7 +304,7 @@ if __name__ == "__main__":
             output += stringify_commits(sorted_commit_list)
             
             if show_cherry_pick_command:
-                output += f"\ngit cherry-pick {' '.join([commit['sha'] for commit in commit_list])}"
+                output += f"\ngit cherry-pick {' '.join([commit['sha'][:7] for commit in commit_list])}"
 
             if output_to_terminal:
                 print(output)
