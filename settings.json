@@ -23,5 +23,6 @@
     "OutputToTxtFile": true,
     "OutputToExcelFile": true,
     "ShowCherryPickCommand": true,
-    "IgnoreMergeCommits": true
+    "IgnoreMergeCommits": true,
+    "UseShortCommitHash": false
 }

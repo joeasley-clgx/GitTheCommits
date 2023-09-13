@@ -9,11 +9,13 @@ import xlsxwriter
 def group_relevant_commit_info(git_commit: GitCommit.GitCommit, item_number, pr_urls: tuple = None, pr_url: str = None) -> object:
     # Condenses all the info from a commit into just the information we need and in a format we can use 
 
+    global use_short_commit_hash
+
     return {
         "message": git_commit.message, 
         "author": f"{git_commit.author.name} <{git_commit.author.email}>",
         "date": git_commit.author.date,
-        "sha": git_commit.sha,
+        "sha": git_commit.sha[:7] if use_short_commit_hash else git_commit.sha,
         "commit url": git_commit.html_url,
         "pr url": pr_url if pr_url != None else (", ".join(pr_urls) if pr_urls != None else "None"),
         "item number": f"CLCTUTD-{str(item_number)}",
@@ -81,6 +83,7 @@ def generate_excel_file(commit_list: list) -> None:
     # Make xlsx file
 
     global cherry_pick_command
+    global use_short_commit_hash
 
     # xlsxwriter package cannot overwrite files
     if os.path.isfile(f"output.xlsx"):
@@ -138,7 +141,7 @@ def generate_excel_file(commit_list: list) -> None:
             header_column_number += 1
         if commit_detail_visibilty["Sha"]: 
             letter = letter_dictionary[header_column_number]
-            worksheet.set_column(f"{letter}:{letter}", 42)
+            worksheet.set_column(f"{letter}:{letter}", 10 if use_short_commit_hash else 42)
             worksheet.write_string(f'{letter}1', "Sha", header_format)
             header_column_number += 1
         if commit_detail_visibilty["IsMergeCommit"]: 
@@ -180,7 +183,7 @@ def generate_excel_file(commit_list: list) -> None:
         
         if show_cherry_pick_command:
             worksheet.merge_range(f"A{row + 2}:{letter_dictionary[header_column_number]}{row + 2}", 
-                                  f"\n{cherry_pick_command}{' '.join([commit['sha'][:7] for commit in commit_list])}", data_format)
+                                  f"\n{cherry_pick_command}{' '.join([commit['sha'] for commit in commit_list])}", data_format)
 
 
 if __name__ == "__main__":
@@ -212,6 +215,8 @@ if __name__ == "__main__":
         show_cherry_pick_command = settings["ShowCherryPickCommand"]
         # If a commit has more than one parent, it will be excluded (Use case, ignore "merge develop to feature branch" commits)
         ignore_merge_commits = settings["IgnoreMergeCommits"]
+        # Specifies whether to use full or short commit hashes in the output (short meaning first 7 characters)
+        use_short_commit_hash = settings["UseShortCommitHash"]
 
     if len(item_numbers) == 0:
         item_numbers = manually_enter_item_numbers()
@@ -305,7 +310,7 @@ if __name__ == "__main__":
 
         
         if show_cherry_pick_command and (output_to_terminal or output_to_txt):
-            output = f"\n{cherry_pick_command}{' '.join([commit['sha'][:7] for commit in sorted_commit_list])}"
+            output = f"\n{cherry_pick_command}{' '.join([commit['sha'] for commit in sorted_commit_list])}"
 
             if output_to_terminal:
                 print(output)
@@ -326,7 +331,7 @@ if __name__ == "__main__":
             output += stringify_commits(sorted_commit_list)
             
             if show_cherry_pick_command:
-                output += f"\n{cherry_pick_command}{' '.join([commit['sha'][:7] for commit in sorted_commit_list])}"
+                output += f"\n{cherry_pick_command}{' '.join([commit['sha'] for commit in sorted_commit_list])}"
 
             if output_to_terminal:
                 print(output)
