@@ -68,20 +68,24 @@ If `true`, keeps commits that are part of the same Jira item together in the out
 3. ShowCommitsInDateDescendingOrder -
 If `true`, sorts the commits by descending order (latest commit first).
 This setting works in tandem with GroupCommitsByItem, so if you want all commits in order, be sure that GroupCommitsByItem is `false`.
-5. OutputToTerminal -
+4. OutputToTerminal -
 If `true`, prints the output to the terminal.
-6. OutputToTxtFile -
+5. OutputToTxtFile -
 If `true`, writes the output to a text file. (text is the same as what's printed to the terminal)
-7. OutputToExcelFile -
+6. OutputToExcelFile -
 If `true`, writes the output to an excel file.
-8. ShowCherryPickCommand -
+7. ShowCherryPickCommand -
 If `true`, writes a git cherry-pick command for all the found commits to any enabled output.
 The command will automatically cherry-pick each commit into the currently checked out branch as *staged* changes.
 This way you can build and verify the changes, enter your commit message, and push as you please.
 (If you get a `fatal: bad revision` error, you need to fetch all remotes: `git fetch --all`)
-10. IgnoreMergeCommits -
+8. IgnoreMergeCommits -
 If `true`, excludes any commit with more than one parent commit.
 Multiple parents are a tell that the commit was merged from elsewhere.
 The main use case for this is to exclude any "Merge develop into feature branch" commits.
+9. UseShortCommitHash -
+If `true`, shortens the commit hash (or SHA) to the first 7 characters.
+This is mainly for reducing output length and does not affect the commit URL.
+For repositories with an enormous amount of commits, this probably needs to be `false`.
 
 Once you've finalized your settings, run `main.py`, kick back, relax, grab some popcorn, then realize you don't have time to make popcorn because the results are in!
