@@ -1,4 +1,4 @@
-from github import Github, Auth, GitCommit
+from github import Github, Auth, GitCommit, GithubException, BadCredentialsException
 
 import json
 import os
@@ -86,8 +86,15 @@ def generate_excel_file(commit_list: list) -> None:
     global use_short_commit_hash
 
     # xlsxwriter package cannot overwrite files
-    if os.path.isfile(f"output.xlsx"):
-        os.remove(f"output.xlsx")
+    if os.path.isfile("output.xlsx"):
+        while True:
+            try:
+                os.remove("output.xlsx")
+            except IOError:
+                print("Please close ouput.xlsx so it can be updated, then press enter.")
+                input()
+            else:
+                break
 
     with xlsxwriter.Workbook(f"output.xlsx") as workbook:
         worksheet = workbook.add_worksheet()
@@ -188,7 +195,15 @@ def generate_excel_file(commit_list: list) -> None:
 
 if __name__ == "__main__":
     with open("settings.json", 'r') as file:
-        settings = json.load(file)
+        try:
+            settings = json.load(file)
+        except json.decoder.JSONDecodeError as exception:
+            print(f"Your settings.json file has a syntax error on line {exception.lineno}. " + 
+                   "Please fix it and try again.")
+            
+            # Do not immediately close program
+            input()
+            exit()
 
         # GitHub Access Token: https://github.com/settings/tokens
         # Required Access: repo - Full control of private repositories (There's unfortuntately no read-only for private repositories)
@@ -223,9 +238,38 @@ if __name__ == "__main__":
 
     auth = Auth.Token(github_Token)
     github = Github(auth=auth)
-    repo = github.get_repo(repository_name)
 
-    target_branch = repo.get_branch(target_branch_name)
+    try:
+        repo = github.get_repo(repository_name)
+    except BadCredentialsException:
+        print("Github responded with a Bad Credentials error. " +
+              "Please ensure that your GitHubToken is valid and has the required permissions, then try again.")
+    except GithubException as exception:
+        if exception.data["message"] == "Not Found":
+            print(f"Could not find the target repository '{repository_name}'. " +
+                   "Please ensure that your TargetRepository is correct " + 
+                   "and your GitHubToken has the required permissions to view the repository, then try again.")
+        else:
+            # Put any unhandled exception to the terminal
+            raise exception
+
+        # Do not immediately close program
+        input()
+        exit()
+
+    try:
+        target_branch = repo.get_branch(target_branch_name)
+    except GithubException as exception:
+        if exception.data["message"] == "Branch not found":
+            print(f"Could not find the target branch '{target_branch_name}'. " +
+                   "Please ensure that your TargetBranch exists, then try again.")
+        else:
+            # Put any unhandled exception to the terminal
+            raise exception
+
+        # Do not immediately close program
+        input()
+        exit()
 
     commit_list = []
     item_commit_dictionary = {} # item_number : [commit_index]
