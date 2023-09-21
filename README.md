@@ -1,4 +1,4 @@
-# GitTheCommits
+# GitTheCommits (AKA Sir Lance-A-Git)
 This is a tool to help gather and merge all associated commits based on a Jira item number automatically.
 Currently it can take a day or two to find and merge all your items properly, plus time later if anything was missed.
 We can cut this time down ten-fold using GitHub's APIs and a bit of snake magic to streamline the merge process.
@@ -19,9 +19,13 @@ This tool can take off the pressure and/or anxiety of trying your best not to mi
 Once set up properly, you just enter your item numbers and run the program.
 
 ## Setup
-1. Install all the packages listed in [requirements.txt](https://github.com/joeasley-clgx/GitTheCommits/blob/main/requirements.txt).
-2. Create a [Personal Access Token](https://github.com/settings/tokens) for this project to use. Ensure that this token has "repo" access, especially if using this tool with a private repository.
-3. Fill in the top three fields in [settings.json](https://github.com/joeasley-clgx/GitTheCommits/blob/main/settings.json) (`GitHubToken`, `TargetRepository`, `TargetBranch`)
+1. Ensure you have a Python 3 version installed on your machine. (Tool developed with version 3.10.5)
+2. Install all the packages listed in [requirements.txt](https://github.com/joeasley-clgx/GitTheCommits/blob/main/requirements.txt).
+3. Create a [Personal Access Token](https://github.com/settings/tokens) for this project to use. Ensure that this token has "repo" access, especially if using this tool with a private repository.
+4. Fill in the top three fields in [settings.json](https://github.com/joeasley-clgx/GitTheCommits/blob/main/settings.json) (`GitHubToken`, `TargetRepository`, `TargetBranch`)
+    - `GitHubToken` is the Personal Access Token your created in step 3.
+    - `TargetRepository` is the path to the repository. (Example: "organization/project", "joeasley-clgx/GitTheCommits")
+    - `TargetBranch` is the branch to grab commits from. Most often this will be the development branch.
 
 # Usage
 First, you'll need to gather all the Jira item numbers you wish to merge.
