@@ -190,7 +190,16 @@ def generate_excel_file(commit_list: list) -> None:
         
         if show_cherry_pick_command:
             worksheet.merge_range(f"A{row + 2}:{letter_dictionary[header_column_number]}{row + 2}", 
-                                  f"\n{cherry_pick_command}{' '.join([commit['sha'] for commit in commit_list])}", data_format)
+                                  generate_cherry_pick_command(commit_list), data_format)
+
+
+def generate_cherry_pick_command(commits: list) -> str:
+    # Sorts commits in acsending date order and returns a git cherry-pick command with those commits
+
+    global cherry_pick_command
+
+    sorted_commits = sorted(commits, key=lambda x: x['date'])
+    return f"\n{cherry_pick_command}{' '.join([commit['sha'] for commit in sorted_commits])}"
 
 
 if __name__ == "__main__":
@@ -354,7 +363,8 @@ if __name__ == "__main__":
 
         
         if show_cherry_pick_command and (output_to_terminal or output_to_txt):
-            output = f"\n{cherry_pick_command}{' '.join([commit['sha'] for commit in sorted_commit_list])}"
+            # git cherry-pick command should stay in date-specific order, despite GroupCommitsByItem setting
+            output = generate_cherry_pick_command(commit_list)
 
             if output_to_terminal:
                 print(output)
@@ -375,7 +385,7 @@ if __name__ == "__main__":
             output += stringify_commits(sorted_commit_list)
             
             if show_cherry_pick_command:
-                output += f"\n{cherry_pick_command}{' '.join([commit['sha'] for commit in sorted_commit_list])}"
+                output += generate_cherry_pick_command(commit_list)
 
             if output_to_terminal:
                 print(output)
