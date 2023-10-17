@@ -96,5 +96,8 @@ There are many options for displaying the related commits:
    If `true`, shortens the commit hash (or SHA) to the first 7 characters.
    This is mainly for reducing output length and does not affect the commit URL.
    For repositories with an enormous amount of commits, this probably needs to be `false`.
+10. GitCherryPickArguments -
+    Denotes what arguments to include with the git cherry-pick.
+    Obviously, this only takes effect if `ShowCherryPickCommand` is `true`.
 
 Once you've finalized your settings, run `main.py`, kick back, relax, grab some popcorn, then realize you don't have time to make popcorn because the results are in!

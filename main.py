@@ -79,6 +79,15 @@ def manually_enter_item_numbers() -> list:
     return item_numbers
 
 
+def generate_cherry_pick_command(commits: list) -> str:
+    # Sorts commits in acsending date order and returns a git cherry-pick command with those commits
+
+    global cherry_pick_command
+
+    sorted_commits = sorted(commits, key=lambda x: x['date'])
+    return f"\n{cherry_pick_command}{' '.join([commit['sha'] for commit in sorted_commits])}"
+
+
 def generate_excel_file(commit_list: list) -> None:
     # Make xlsx file
 
@@ -193,15 +202,6 @@ def generate_excel_file(commit_list: list) -> None:
                                   generate_cherry_pick_command(commit_list), data_format)
 
 
-def generate_cherry_pick_command(commits: list) -> str:
-    # Sorts commits in acsending date order and returns a git cherry-pick command with those commits
-
-    global cherry_pick_command
-
-    sorted_commits = sorted(commits, key=lambda x: x['date'])
-    return f"\n{cherry_pick_command}{' '.join([commit['sha'] for commit in sorted_commits])}"
-
-
 if __name__ == "__main__":
     with open("settings.json", 'r') as file:
         try:
@@ -241,6 +241,8 @@ if __name__ == "__main__":
         ignore_merge_commits = settings["IgnoreMergeCommits"]
         # Specifies whether to use full or short commit hashes in the output (short meaning first 7 characters)
         use_short_commit_hash = settings["UseShortCommitHash"]
+        # Denotes all arguments for the git cherry-pick command
+        git_cherry_pick_arguments = settings["GitCherryPickArguments"]
 
     if len(item_numbers) == 0:
         item_numbers = manually_enter_item_numbers()
@@ -324,8 +326,12 @@ if __name__ == "__main__":
     # Output commits
     total_output = ""
     output = f"Found {len(commit_list)} related commit{'' if len(commit_list) == 1 else 's'}"
+    
+    cherry_pick_command_segments = ["git cherry-pick", git_cherry_pick_arguments, '-m 1 ' if not ignore_merge_commits else '']
+    if git_cherry_pick_arguments == None or len(str(git_cherry_pick_arguments).strip()) == 0:
+        cherry_pick_command_segments.pop(1)
 
-    cherry_pick_command = f"git cherry-pick -n --strategy=recursive -X theirs {'-m 1 ' if not ignore_merge_commits else ''}"
+    cherry_pick_command = ' '.join(cherry_pick_command_segments)
 
     if output_to_terminal:
         print("\n" + output)

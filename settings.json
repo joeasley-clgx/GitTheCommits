@@ -1,7 +1,7 @@
 {
     "GitHubToken": "PlaceYourTokenHere",
     "TargetRepository": "user/repository",
-    "TargetBranch": "master",
+    "TargetBranch": "develop",
     "ItemNumbers": [
         1234
     ],
@@ -24,5 +24,6 @@
     "OutputToExcelFile": true,
     "ShowCherryPickCommand": true,
     "IgnoreMergeCommits": true,
-    "UseShortCommitHash": false
+    "UseShortCommitHash": false,
+    "GitCherryPickArguments": "-n --strategy=recursive"
 }
