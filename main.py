@@ -30,7 +30,9 @@ def save_commit_info(commit: GitCommit.GitCommit, item_number: str, pr_urls: tup
     global item_commit_dictionary
     global ignore_merge_commits
 
-    if not commit.sha in [commit['sha'] for commit in commit_list]:
+    commit_sha = commit.sha[:7] if use_short_commit_hash else commit.sha
+
+    if not commit_sha in [commit['sha'] for commit in commit_list]:
         commit_info = group_relevant_commit_info(commit, item_number, pr_urls, pr_url)
 
         if not ignore_merge_commits or not commit_info['is merge']:
