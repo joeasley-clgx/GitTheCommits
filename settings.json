@@ -25,5 +25,6 @@
     "ShowCherryPickCommand": true,
     "IgnoreMergeCommits": true,
     "UseShortCommitHash": false,
-    "GitCherryPickArguments": "-n --strategy=recursive"
+    "GitCherryPickArguments": "-n --strategy=recursive",
+    "SearchLimitMonths": 2
 }

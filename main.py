@@ -1,4 +1,6 @@
 from github import Github, Auth, GitCommit, GithubException, BadCredentialsException
+from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 
 import json
 import os
@@ -245,6 +247,8 @@ if __name__ == "__main__":
         use_short_commit_hash = settings["UseShortCommitHash"]
         # Denotes all arguments for the git cherry-pick command
         git_cherry_pick_arguments = settings["GitCherryPickArguments"]
+        # Limit how far back we search for commits
+        search_date_limit = (datetime.today() - relativedelta(months=int(settings["SearchLimitMonths"]))).replace(tzinfo=timezone.utc) if settings["SearchLimitMonths"] else None
 
     if len(item_numbers) == 0:
         item_numbers = manually_enter_item_numbers()
@@ -290,7 +294,7 @@ if __name__ == "__main__":
     if output_to_terminal:
         print("Fetching commits", end='', flush=True)
     if use_commit_history:
-        for commit_object in repo.get_commits(sha=target_branch.commit.sha):
+        for commit_object in repo.get_commits(sha=target_branch.commit.sha, since=search_date_limit) if search_date_limit else repo.get_commits(sha=target_branch.commit.sha):
             commit = commit_object.commit
             matches = [item_number for item_number in item_numbers if(item_number in commit.message)]
             if len(matches) > 0:
@@ -302,17 +306,27 @@ if __name__ == "__main__":
                 save_commit_info(commit, item_number, pr_urls=pr_urls)
 
     if use_pull_requests:
-        for pull in repo.get_pulls(state="closed", base=target_branch_name):
-            matches = [item_number for item_number in item_numbers if(item_number in pull.head.ref)]
-            if len(matches) > 0:
-                if output_to_terminal:
-                    print('.', end='', flush=True)
+        processed_pull_requests = []
 
-                item_number = matches[0]
-                for commit_object in pull.get_commits():
-                    if pull.merged:
-                        pr_urls = pull.html_url
-                        save_commit_info(commit_object.commit, item_number, pr_url=pull.html_url)
+        for pull in repo.get_pulls(state="closed", base=target_branch_name):
+            if search_date_limit != None and pull.created_at < search_date_limit:
+                break
+
+            if pull.merged:
+                matches = [item_number for item_number in item_numbers if(item_number in pull.head.ref)]
+                if len(matches) > 0:
+                    item_number = matches[0]
+
+                    # Only save commits for pull requests we haven't processed
+                    if not pull.number in processed_pull_requests:
+                        processed_pull_requests.append(pull.number)
+                    
+                        if output_to_terminal:
+                            print('.', end='', flush=True)
+
+                        for commit_object in pull.get_commits():
+                            pr_urls = pull.html_url
+                            save_commit_info(commit_object.commit, item_number, pr_url=pull.html_url)
 
     if len(commit_list) == 0:
         output = "No commits found"
