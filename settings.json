@@ -13,7 +13,8 @@
         "CommitUrl": false,
         "PullRequestUrl": true,
         "Sha": true,
-        "IsMergeCommit": false
+        "IsMergeCommit": false,
+        "CherryPickCommand": false
     },
     "GroupCommitsByItem": false,
     "ShowCommitsInDateDescendingOrder": false,
