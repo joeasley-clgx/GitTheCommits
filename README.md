@@ -101,5 +101,8 @@ There are many options for displaying the related commits:
 10. GitCherryPickArguments -
     Denotes what arguments to include with the git cherry-pick.
     Obviously, this only takes effect if `ShowCherryPickCommand` is `true`.
+11. SearchLimitMonths -
+    Limits how far back we search for commits by X month(s).
+    This helps speed up the fetch process if you know what time frame your changes were made
 
 Once you've finalized your settings, run `main.py`, kick back, relax, grab some popcorn, then realize you don't have time to make popcorn because the results are in!
