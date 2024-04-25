@@ -4214,6 +4214,64 @@ class TestOutputCommits(unittest.TestCase):
         mock_print.assert_has_calls(expected_calls, any_order=False)
 
     
+    @patch('builtins.input', return_value='')
+    @patch('builtins.print')
+    def test_terminal_group_commit_cherry_pick_not_ran_without_group_commits_by_item(self, mock_print, mock_input):
+        # Arrange
+        commit1 = CommitInfo(
+            "commit1 for item1", 
+            "author1", 
+            datetime.strptime("2022-01-01", "%Y-%m-%d"), 
+            "1234567890", 
+            "www.google.com/commit1", 
+            "www.google.com/pr1", 
+            "1", 
+            False
+        )
+        commit2 = CommitInfo(
+            "commit2 for item1", 
+            "author2", 
+            datetime.strptime("2022-01-02", "%Y-%m-%d"), 
+            "0987654321", 
+            "www.google.com/commit2", 
+            "www.google.com/pr2", 
+            "1", 
+            False
+        )
+        commit3 = CommitInfo(
+            "commit for item2", 
+            "author3", 
+            datetime.strptime("2022-01-03", "%Y-%m-%d"), 
+            "2345678901", 
+            "www.google.com/commit3", 
+            "www.google.com/pr3", 
+            "2", 
+            False
+        )
+
+        target = GitTheCommits(False)
+        target.output_to_terminal = True
+        target.group_commits_by_item = False
+        target.group_commit_cherry_pick = True
+        target.order_commits_by_date_descend = False
+        target.show_cherry_pick_command = False
+        target.commit_detail_visibilty.message = True
+
+        target.commit_list = [commit1, commit2, commit3]
+        target.item_numbers = ["1", "2"]
+        target.item_commit_dictionary = {"1": [0, 1], "2": [2]}
+
+        # Act
+        target.output_commits()
+
+        # Assert
+        expected_calls = [
+            call('\nFound 3 related commits'),
+            call('Here are all commits for your items in acsending order:\n\n- commit1 for item1\n\n- commit2 for item1\n\n- commit for item2\n')
+        ]
+        mock_print.assert_has_calls(expected_calls, any_order=False)
+    
+    
     @patch('builtins.open', new_callable=mock_open)
     def test_txt_finds_commits_for_multiple_items(self, mock_open):
         # Arrange
@@ -4435,6 +4493,59 @@ class TestOutputCommits(unittest.TestCase):
         # Assert
         mock_open().write.assert_called_once_with('Found 2 related commits\nHere are all commits for your items in acsending order:\n\n- commit for item1\n\n- commit for item2\n\ngit cherry-pick 1234567890 0987654321')
 
+    
+    @patch('builtins.open', new_callable=mock_open)
+    def test_txt_group_commit_cherry_pick_not_ran_without_group_commits_by_item(self, mock_open):
+        # Arrange
+        commit1 = CommitInfo(
+            "commit1 for item1", 
+            "author1", 
+            datetime.strptime("2022-01-01", "%Y-%m-%d"), 
+            "1234567890", 
+            "www.google.com/commit1", 
+            "www.google.com/pr1", 
+            "1", 
+            False
+        )
+        commit2 = CommitInfo(
+            "commit2 for item1", 
+            "author2", 
+            datetime.strptime("2022-01-02", "%Y-%m-%d"), 
+            "0987654321", 
+            "www.google.com/commit2", 
+            "www.google.com/pr2", 
+            "1", 
+            False
+        )
+        commit3 = CommitInfo(
+            "commit for item2", 
+            "author3", 
+            datetime.strptime("2022-01-03", "%Y-%m-%d"), 
+            "2345678901", 
+            "www.google.com/commit3", 
+            "www.google.com/pr3", 
+            "2", 
+            False
+        )
+
+        target = GitTheCommits(False)
+        target.output_to_txt = True
+        target.group_commits_by_item = False
+        target.group_commit_cherry_pick = True
+        target.order_commits_by_date_descend = False
+        target.show_cherry_pick_command = False
+        target.commit_detail_visibilty.message = True
+
+        target.commit_list = [commit1, commit2, commit3]
+        target.item_numbers = ["1", "2"]
+        target.item_commit_dictionary = {"1": [0, 1], "2": [2]}
+
+        # Act
+        target.output_commits()
+
+        # Assert
+        mock_open().write.assert_called_once_with('Found 3 related commits\nHere are all commits for your items in acsending order:\n\n- commit1 for item1\n\n- commit2 for item1\n\n- commit for item2\n')
+    
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
     def test_excel_finds_commits_for_multiple_items(self, mock_generate_excel_file):
