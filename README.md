@@ -74,6 +74,8 @@ There are many options for displaying the related commits:
    Toggle these to `true` or `false` as you see fit.
 2. GroupCommitsByItem -
    If `true`, keeps commits that are part of the same Jira item together in the output.
+2. GroupCommitCherryPick -
+   If `true`, shows the git cherry-pick command for each group of commits under an item. (cherry-pick for 'item-123', another for 'item-456')
 3. ShowCommitsInDateDescendingOrder -
    If `true`, sorts the commits by descending order (latest commit first).
    This setting works in tandem with GroupCommitsByItem, so if you want all commits in order, be sure that GroupCommitsByItem is `false`.

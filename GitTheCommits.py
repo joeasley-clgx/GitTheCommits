@@ -21,8 +21,10 @@ class GitTheCommits:
     repository_name: str
     target_branch_name: str
     item_numbers: list[str]
+    strip_characters_from_item_numbers: bool
     commit_detail_visibilty: CommitDetailVisibility
     group_commits_by_item: bool
+    group_commit_cherry_pick: bool
     order_commits_by_date_descend: bool
     use_commit_history: bool
     use_pull_requests: bool
@@ -43,16 +45,18 @@ class GitTheCommits:
 
     def __init__(self, print_version = True) -> None:
         if print_version: 
-            print("GitTheCommits v2.0.0\n")
+            print("GitTheCommits v2.1.0\n")
 
         # Settings
         self.settings_are_set = False
         self.github_token = None
         self.repository_name = None
         self.target_branch_name = None
+        self.strip_characters_from_item_numbers = None
         self.item_numbers = None
         self.commit_detail_visibilty = CommitDetailVisibility()
         self.group_commits_by_item = None
+        self.group_commit_cherry_pick = None
         self.order_commits_by_date_descend = None
         self.use_commit_history = None
         self.use_pull_requests = None
@@ -125,7 +129,7 @@ class GitTheCommits:
         output = ""
         for commit in commit_list:
             if self.commit_detail_visibilty.message: output += f"\n- {commit.message}"
-            if self.commit_detail_visibilty.item_number: output += f"\nItem Number: {commit.item_number}"
+            if self.commit_detail_visibilty.item_number: output += f"\nItem{' Number' if self.strip_characters_from_item_numbers else ''}: {commit.item_number}"
             if self.commit_detail_visibilty.author: output += f"\nAuthor: {commit.author}"
             if self.commit_detail_visibilty.date: output += f"\nDate: {commit.date}"
             if self.commit_detail_visibilty.commit_url: output += f"\nCommit URL: {commit.commit_url}"
@@ -151,7 +155,9 @@ class GitTheCommits:
         enter_numbers_manually_input = input("Would you like to enter those item numbers now? (Y/N) ").lower()
         if len(enter_numbers_manually_input) > 0 and enter_numbers_manually_input[0] == 'y':
             item_numbers_input = input("Please enter your item numbers separated by commas. Press ENTER when done:\n")
-            item_numbers = self.strip_non_digit_characters_from_list_of_strings(item_numbers_input.split(','))
+            item_numbers = item_numbers_input.split(',')
+            if self.strip_characters_from_item_numbers:
+                item_numbers = self.strip_non_digit_characters_from_list_of_strings(item_numbers)
             print("Item numbers I'll search for:")
             print(", ".join([f"{item_number}" for item_number in item_numbers]) + "\n")
         else:
@@ -182,8 +188,15 @@ class GitTheCommits:
         self.repository_name = new_settings["TargetRepository"]
         self.target_branch_name = new_settings["TargetBranch"]
 
-        # Convert ItemNumbers into a string containing only numbers (1234 or "ITEM-1234" becomes "1234")
-        self.item_numbers = self.strip_non_digit_characters_from_list_of_strings(new_settings["ItemNumbers"])
+        # If true, removes all non-digit characters from the item numbers
+        self.strip_characters_from_item_numbers = new_settings["StripCharactersFromItemNumbers"]
+
+        if self.strip_characters_from_item_numbers:
+            # Convert ItemNumbers into a string containing only numbers (1234 or "ITEM-1234" becomes "1234")
+            self.item_numbers = self.strip_non_digit_characters_from_list_of_strings(new_settings["ItemNumbers"])
+        else:
+            # Ensure all item numbers are strings
+            self.item_numbers = [str(item_number) for item_number in new_settings["ItemNumbers"]]
 
         # A dictionary of what details should be included in the output
         commitDetailsToShow = new_settings["CommitDetailsToShow"]
@@ -201,6 +214,9 @@ class GitTheCommits:
 
         # If true, groups each commit by the Jira item number
         self.group_commits_by_item = new_settings["GroupCommitsByItem"]
+
+        # If true, shows the git cherry-pick command for each group of commits under an item
+        self.group_commit_cherry_pick = new_settings["GroupCommitCherryPick"]
 
         # If true, sorts the commits by descending order (latest commit first)
         self.order_commits_by_date_descend = new_settings["ShowCommitsInDateDescendingOrder"]
@@ -304,7 +320,7 @@ class GitTheCommits:
             if self.commit_detail_visibilty.item_number: 
                 letter = letter_dictionary[header_column_number]
                 worksheet.set_column(f"{letter}:{letter}", 15)
-                worksheet.write_string(f'{letter}1', "Item Number", header_format)
+                worksheet.write_string(f'{letter}1', f"Item{' Number' if self.strip_characters_from_item_numbers else ''}", header_format)
                 header_column_number += 1
             if self.commit_detail_visibilty.author: 
                 letter = letter_dictionary[header_column_number]
@@ -393,8 +409,11 @@ class GitTheCommits:
             for commit_object in github_commits:
                 commit = commit_object.commit
 
-                commit_message_numbers = re.sub("\D+", '-', commit.message).strip('-').split('-')
-                matched_item_numbers = [item_number for item_number in self.item_numbers if(item_number in commit_message_numbers)]
+                commit_message = commit.message
+                if self.strip_characters_from_item_numbers:
+                    commit_message = re.sub("\D+", '-', commit_message).strip('-').split('-')
+
+                matched_item_numbers = [item_number for item_number in self.item_numbers if(item_number in commit_message)]
                 if len(matched_item_numbers) > 0:
                     item_number = matched_item_numbers[0]
 
@@ -410,9 +429,11 @@ class GitTheCommits:
                     break
 
                 if pull.merged:
-                    pull_head_branch_numbers = re.sub("\D+", '-', pull.head.ref).strip('-').split('-')
+                    pull_head_branch = pull.head.ref
+                    if self.strip_characters_from_item_numbers:
+                        pull_head_branch = re.sub("\D+", '-', pull_head_branch).strip('-').split('-')
 
-                    matched_item_numbers = [item_number for item_number in self.item_numbers if(item_number in pull_head_branch_numbers)]
+                    matched_item_numbers = [item_number for item_number in self.item_numbers if(item_number in pull_head_branch)]
                     if len(matched_item_numbers) > 0:
                         item_number = matched_item_numbers[0]
                         
@@ -470,6 +491,9 @@ class GitTheCommits:
                 if self.output_to_terminal or self.output_to_txt:
                     output = f"\nCommit{'' if len(item_commit_list) == 1 else 's'} for {item_number} ({len(item_commit_list)}):"
                     output += self.stringify_commits(sorted_commit_list)
+                    if self.group_commit_cherry_pick:
+                        output += self.generate_cherry_pick_command(item_commit_list)
+
                     output += "\n---"
 
                     if self.output_to_terminal:

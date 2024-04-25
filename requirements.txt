@@ -1,3 +1,4 @@
 PyGithub
 xlsxwriter
 python-dateutil
+coverage
