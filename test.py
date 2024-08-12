@@ -4788,7 +4788,7 @@ class TestGetGithubObjects(unittest.TestCase):
         target.get_github_objects()
 
         # Assert
-        mock_github.assert_called_once_with(auth=mock_token())
+        mock_github.assert_called_once_with(auth=mock_token(), seconds_between_requests=target.seconds_between_requests)
         mock_github.return_value.get_repo.assert_called_once_with('mock_repo')
         mock_repo.get_branch.assert_called_once_with('mock_branch')
         self.assertEqual(target.github_repository, mock_repo)
