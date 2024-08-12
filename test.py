@@ -1864,8 +1864,8 @@ class TestGenerateExcelFile(unittest.TestCase):
         mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
 
 
-class TestFetchCommits(unittest.TestCase):
-    def test_use_pull_requests_returns_commit_from_pr_with_item_number(self):
+class TestFetchCommits(unittest.IsolatedAsyncioTestCase):
+    async def test_use_pull_requests_returns_commit_from_pr_with_item_number(self):
         # Arrange
         git_commit = Mock()
         git_commit.commit = generate_git_commit_object(
@@ -1900,7 +1900,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         self.assertEqual(1, len(target.commit_list))
@@ -1909,7 +1909,7 @@ class TestFetchCommits(unittest.TestCase):
         self.assertEqual("0987654321098765432109876543210987654321", result_commit.sha)
 
     
-    def test_use_commit_history_returns_commit_from_history_with_item_number(self):
+    async def test_use_commit_history_returns_commit_from_history_with_item_number(self):
         # Arrange
         git_commit = Mock()
         git_commit = generate_git_commit_object(
@@ -1966,7 +1966,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_target_branch = mock_branch
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Assert
         self.assertEqual(1, len(target.commit_list))
@@ -1976,7 +1976,7 @@ class TestFetchCommits(unittest.TestCase):
 
 
     @patch('builtins.print')
-    def test_use_pull_requests_outputs_to_terminal(self, mock_print):
+    async def test_use_pull_requests_outputs_to_terminal(self, mock_print):
         # Arrange
         git_commit = Mock()
         git_commit.commit = generate_git_commit_object(
@@ -2012,7 +2012,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         self.assertEqual(1, len(target.commit_list))
@@ -2024,7 +2024,7 @@ class TestFetchCommits(unittest.TestCase):
 
 
     @patch('builtins.print')
-    def test_use_commit_history_outputs_to_terminal(self, mock_print):
+    async def test_use_commit_history_outputs_to_terminal(self, mock_print):
         # Arrange
         git_commit = Mock()
         git_commit = generate_git_commit_object(
@@ -2082,7 +2082,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_target_branch = mock_branch
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Assert
         self.assertEqual(1, len(target.commit_list))
@@ -2093,7 +2093,7 @@ class TestFetchCommits(unittest.TestCase):
         mock_print.assert_has_calls(expected_calls, any_order=False)
 
 
-    def test_use_pull_requests_returns_multiple_commits_from_pr_with_item_number(self):
+    async def test_use_pull_requests_returns_multiple_commits_from_pr_with_item_number(self):
         # Arrange
         git_commit_1 = Mock()
         git_commit_1.commit = generate_git_commit_object(
@@ -2141,7 +2141,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         self.assertEqual(2, len(target.commit_list))
@@ -2153,7 +2153,7 @@ class TestFetchCommits(unittest.TestCase):
         self.assertEqual("1234567890123456789012345678901234567890", result_commit_2.sha)
 
 
-    def test_use_commit_history_returns_multiple_commits_with_item_number(self):
+    async def test_use_commit_history_returns_multiple_commits_with_item_number(self):
         # Arrange
         git_commit_1 = generate_git_commit_object(
             GitCommitDetails(
@@ -2229,7 +2229,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_target_branch = mock_branch
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Assert
         self.assertEqual(2, len(target.commit_list))
@@ -2241,7 +2241,7 @@ class TestFetchCommits(unittest.TestCase):
         self.assertEqual("0987654321098765432109876543210987654322", result_commit_2.sha)
 
 
-    def test_use_pull_requests_returns_only_pr_with_item_number(self):
+    async def test_use_pull_requests_returns_only_pr_with_item_number(self):
         # Arrange
         git_commit_1 = Mock()
         git_commit_1.commit = generate_git_commit_object(
@@ -2297,7 +2297,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         self.assertEqual(1, len(target.commit_list))
@@ -2306,7 +2306,7 @@ class TestFetchCommits(unittest.TestCase):
         self.assertEqual("0987654321098765432109876543210987654321", result_commit_1.sha)
 
 
-    def test_use_commit_history_returns_only_pr_with_item_number(self):
+    async def test_use_commit_history_returns_only_pr_with_item_number(self):
         # Arrange
         git_commit_1 = generate_git_commit_object(
             GitCommitDetails(
@@ -2382,7 +2382,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_target_branch = mock_branch
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Assert
         self.assertEqual(1, len(target.commit_list))
@@ -2391,7 +2391,7 @@ class TestFetchCommits(unittest.TestCase):
         self.assertEqual("0987654321098765432109876543210987654321", result_commit.sha)
 
 
-    def test_use_pull_requests_skips_unmerged_prs(self):
+    async def test_use_pull_requests_skips_unmerged_prs(self):
         # Arrange
         git_commit = Mock()
         git_commit.commit = generate_git_commit_object(
@@ -2426,13 +2426,13 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         self.assertEqual(0, len(target.commit_list))
 
 
-    def test_use_pull_requests_returns_prs_within_search_date_limit(self):
+    async def test_use_pull_requests_returns_prs_within_search_date_limit(self):
         # Arrange
         git_commit_1 = Mock()
         git_commit_1.commit = generate_git_commit_object(
@@ -2488,7 +2488,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         self.assertEqual(1, len(target.commit_list))
@@ -2497,7 +2497,7 @@ class TestFetchCommits(unittest.TestCase):
         self.assertEqual("0987654321098765432109876543210987654321", result_commit_1.sha)
 
     
-    def test_use_commit_history_returns_commits_within_search_date_limit(self):
+    async def test_use_commit_history_returns_commits_within_search_date_limit(self):
         # Arrange
         git_commit = Mock()
         git_commit = generate_git_commit_object(
@@ -2555,13 +2555,13 @@ class TestFetchCommits(unittest.TestCase):
         target.github_target_branch = mock_branch
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Assert
         target.github_repository.get_commits.assert_called_once_with(sha=mock_branch.commit.sha, since=target.search_date_limit)
 
 
-    def test_use_pull_requests_returns_prs_which_have_item_numbers_inside_each_other(self):
+    async def test_use_pull_requests_returns_prs_which_have_item_numbers_inside_each_other(self):
         # Arrange
         git_commit_1 = Mock()
         git_commit_1.commit = generate_git_commit_object(
@@ -2637,7 +2637,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         self.assertEqual(3, len(target.commit_list))
@@ -2664,7 +2664,7 @@ class TestFetchCommits(unittest.TestCase):
         self.assertEqual("1234567890123456789012345678901234567890", commit_12345.sha)
 
 
-    def test_use_pull_requests_can_distinguish_separated_numbers(self):
+    async def test_use_pull_requests_can_distinguish_separated_numbers(self):
         # Arrange
         git_commit_1 = Mock()
         git_commit_1.commit = generate_git_commit_object(
@@ -2719,7 +2719,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         self.assertEqual(1, len(target.commit_list))
@@ -2728,7 +2728,7 @@ class TestFetchCommits(unittest.TestCase):
         self.assertEqual("1234567890123456789012345678901234567890", result_commit_1.sha)
 
 
-    def test_use_commit_history_can_distinguish_separated_numbers(self):
+    async def test_use_commit_history_can_distinguish_separated_numbers(self):
         # Arrange
         git_commit_1 = generate_git_commit_object(
             GitCommitDetails(
@@ -2811,7 +2811,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_target_branch = mock_branch
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Assert
         self.assertEqual(1, len(target.commit_list))
@@ -2821,7 +2821,7 @@ class TestFetchCommits(unittest.TestCase):
 
 
     @patch('GitTheCommits.GitTheCommits.manually_enter_item_numbers')
-    def test_handles_no_initial_item_numbers(self, mock_enter_item_numbers):
+    async def test_handles_no_initial_item_numbers(self, mock_enter_item_numbers):
         # Arrange
         git_commit = Mock()
         git_commit.commit = generate_git_commit_object(
@@ -2858,14 +2858,14 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         mock_enter_item_numbers.assert_called_once()
         self.assertEqual(1, len(target.commit_list))
 
 
-    def test_use_pull_requests_returns_commit_from_pr_for_item_with_characters(self):
+    async def test_use_pull_requests_returns_commit_from_pr_for_item_with_characters(self):
         # Arrange
         git_commit = Mock()
         git_commit.commit = generate_git_commit_object(
@@ -2900,7 +2900,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_repository = mock_repo
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Arrange
         self.assertEqual(1, len(target.commit_list))
@@ -2909,7 +2909,7 @@ class TestFetchCommits(unittest.TestCase):
         self.assertEqual("0987654321098765432109876543210987654321", result_commit.sha)
 
     
-    def test_use_commit_history_returns_commit_from_history_for_item_with_characters(self):
+    async def test_use_commit_history_returns_commit_from_history_for_item_with_characters(self):
         # Arrange
         git_commit = Mock()
         git_commit = generate_git_commit_object(
@@ -2966,7 +2966,7 @@ class TestFetchCommits(unittest.TestCase):
         target.github_target_branch = mock_branch
 
         # Act
-        target.fetch_commits()
+        await target.fetch_commits()
 
         # Assert
         self.assertEqual(1, len(target.commit_list))

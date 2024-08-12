@@ -1,9 +1,10 @@
-from github import Github, Auth, GitCommit, GithubException, BadCredentialsException, Branch, Repository
+from github import Github, Auth, GitCommit, GithubException, BadCredentialsException, Branch, Repository, PullRequest, Commit
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 from CommitDetailVisibility import CommitDetailVisibility
 from CommitInfo import CommitInfo
 
+import asyncio
 import json
 import os
 import re
@@ -15,6 +16,8 @@ class GitTheCommits:
     Gathers and outputs all associated commits based on Jira item numbers
     """
     short_commit_hash_length = 10
+    # 1.5 seems to be a good middle ground between speed and not hitting GitHub's rate-limit
+    seconds_between_requests = 1.5
 
     settings_are_set: bool
     github_token: str
@@ -45,7 +48,7 @@ class GitTheCommits:
 
     def __init__(self, print_version = True) -> None:
         if print_version: 
-            print("GitTheCommits v2.1.0\n")
+            print("GitTheCommits v2.2.0\n")
 
         # Settings
         self.settings_are_set = False
@@ -389,44 +392,16 @@ class GitTheCommits:
                                     self.generate_cherry_pick_command(commit_list), data_format)
                 
 
-    def fetch_commits(self) -> None:
+    async def fetch_commits(self) -> None:
         """
         Uses the class' GitHub properties to fetch all commits according to all relevant settings
         """
-        
-        if len(self.item_numbers) == 0:
-            self.item_numbers = self.manually_enter_item_numbers()
-        
-        if self.output_to_terminal:
-            print("Fetching commits", end='', flush=True)
-        if self.use_commit_history:
-            github_commits = None
-            if self.search_date_limit != None:
-                github_commits = self.github_repository.get_commits(sha=self.github_target_branch.commit.sha, since=self.search_date_limit) 
-            else:
-                github_commits =  self.github_repository.get_commits(sha=self.github_target_branch.commit.sha)
 
-            for commit_object in github_commits:
-                commit = commit_object.commit
 
-                commit_message = commit.message
-                if self.strip_characters_from_item_numbers:
-                    commit_message = re.sub("\D+", '-', commit_message).strip('-').split('-')
-
-                matched_item_numbers = [item_number for item_number in self.item_numbers if(item_number in commit_message)]
-                if len(matched_item_numbers) > 0:
-                    item_number = matched_item_numbers[0]
-
-                    if self.output_to_terminal:
-                        print('.', end='', flush=True)
-
-                    pr_urls = (pull.html_url for pull in commit_object.get_pulls())
-                    self.save_commit_info(commit, item_number, pr_urls=pr_urls)
-
-        if self.use_pull_requests:
-            for pull in self.github_repository.get_pulls(state="closed", base=self.target_branch_name):
+        async def process_pull_requests_async(pull: PullRequest.PullRequest) -> None:
+            def process_pull_requests(pull: PullRequest.PullRequest):
                 if self.search_date_limit != None and pull.created_at < self.search_date_limit:
-                    break
+                    return
 
                 if pull.merged:
                     pull_head_branch = pull.head.ref
@@ -442,6 +417,49 @@ class GitTheCommits:
 
                         for commit_object in pull.get_commits():
                             self.save_commit_info(commit_object.commit, item_number, pr_url=pull.html_url)
+
+            return await asyncio.to_thread(process_pull_requests, pull)
+
+        
+        async def process_commits_async(commit_object: Commit.Commit) -> None:
+            def process_commits(commit_object: Commit.Commit):
+                commit = commit_object.commit
+
+                commit_message = commit.message
+                if self.strip_characters_from_item_numbers:
+                    commit_message = re.sub("\D+", '-', commit_message).strip('-').split('-')
+
+                matched_item_numbers = [item_number for item_number in self.item_numbers if(item_number in commit_message)]
+                if len(matched_item_numbers) > 0:
+                    item_number = matched_item_numbers[0]
+
+                    if self.output_to_terminal:
+                        print('.', end='', flush=True)
+
+                    pr_urls = (pull.html_url for pull in commit_object.get_pulls())
+                    self.save_commit_info(commit, item_number, pr_urls=pr_urls)
+            
+            return await asyncio.to_thread(process_commits, commit_object)
+
+        
+        if len(self.item_numbers) == 0:
+            self.item_numbers = self.manually_enter_item_numbers()
+        
+        if self.output_to_terminal:
+            print("Fetching commits", end='', flush=True)
+        if self.use_commit_history:
+            github_commits = None
+            if self.search_date_limit != None:
+                github_commits = self.github_repository.get_commits(sha=self.github_target_branch.commit.sha, since=self.search_date_limit) 
+            else:
+                github_commits =  self.github_repository.get_commits(sha=self.github_target_branch.commit.sha)
+
+            await asyncio.gather(*[process_commits_async(commit_object) for commit_object in github_commits])
+
+        if self.use_pull_requests:
+            pull_requests = self.github_repository.get_pulls(state="closed", base=self.target_branch_name)
+
+            await asyncio.gather(*[process_pull_requests_async(pull) for pull in pull_requests])
                 
     
     def output_commits(self) -> None:
@@ -547,7 +565,7 @@ class GitTheCommits:
         """
 
         auth = Auth.Token(self.github_token)
-        github = Github(auth=auth)
+        github = Github(auth=auth, seconds_between_requests=self.seconds_between_requests)
 
         try:
             self.github_repository = github.get_repo(self.repository_name)
