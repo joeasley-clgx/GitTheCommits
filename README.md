@@ -43,7 +43,7 @@ Next, you need to configure how the program will both fetch and output the commi
 
 There are two main methods of associating commits to Jira items.
 
-### Using Merged Pull Requests **(Recommended)**:
+### Using Merged Pull Requests **(Slower, but Thorough)**:
 
 Use this method if your repository puts the Jira item number in the branch's name.
 How this works is we grab all of the closed pull requests to the `TargetBranch`.
@@ -56,7 +56,7 @@ This ensures two main things:
 
 To turn on, set `UsePullRequests` to `true`
 
-### Using Commit Messages:
+### Using Commit Messages **(Fastest)**:
 
 Use this method if your repository puts the Jira item number in the commit message.
 This one's simple, if the item number is within the commit message, we grab it.
@@ -64,6 +64,13 @@ This one's simple, if the item number is within the commit message, we grab it.
 Keep in mind, because we check the commit message, this method will oftentimes pull in merge commits as well as the original commits if pull requests are not squashed.
 
 To turn on, set `UseCommitHistory` to `true`.
+
+### Note:
+If you have OutputToTerminal enabled and you see "403: Forbidden. Retrying in 60 seconds" show up, don't panic, that's just Github's rate limiting.
+This appears to happen more often when using Pull Requests.
+
+If it happens, let the program continue.
+Your results will be displayed all the same.
 
 ## Outputing Commits
 
@@ -106,3 +113,9 @@ There are many options for displaying the related commits:
     This helps speed up the fetch process if you know what time frame your changes were made
 
 Once you've finalized your settings, run `main.py`, kick back, relax, grab some popcorn, then realize you don't have time to make popcorn because the results are in!
+
+# Development
+If you run through the setup section, you'll have all you need to make changes as you wish.
+For stability purposes, there are unit tests you can run with `python -m unittest` to validate existing functionality.
+
+If you make a change that you'd like to make permanent, create a Pull Request and we'll take a look!
