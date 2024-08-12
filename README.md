@@ -117,5 +117,6 @@ Once you've finalized your settings, run `main.py`, kick back, relax, grab some 
 # Development
 If you run through the setup section, you'll have all you need to make changes as you wish.
 For stability purposes, there are unit tests you can run with `python -m unittest` to validate existing functionality.
+For code coverage, I've used the [coverage](https://pypi.org/project/coverage/) package, using `coverage run -m unittest test.py` to run and `coverage html` to fancy up the results.
 
 If you make a change that you'd like to make permanent, create a Pull Request and we'll take a look!
