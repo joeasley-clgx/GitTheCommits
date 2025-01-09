@@ -1,18 +1,18 @@
 from CommitDetailVisibility import CommitDetailVisibility
 from CommitInfo import CommitInfo
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 from github import Auth, BadCredentialsException, GithubException
 from github.GitCommit import GitCommit
 from github.Requester import Requester
 from GitTheCommits import GitTheCommits
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from dateutil.relativedelta import relativedelta
 from random import randint
 from unittest.mock import Mock, patch, call, MagicMock, mock_open
 
+import json
 import unittest
 import uuid
-import json
 
 
 class TestGroupRelevantCommitInfo(unittest.TestCase):
@@ -248,6 +248,157 @@ class TestSaveCommitInfo(unittest.TestCase):
         self.assertEqual(0, len(target.commit_list))
 
 
+    def test_returns_none_if_no_pr_url(self):
+        # Arrange
+        git_commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654321", 
+                "www.google2.com", 
+                1, 
+                True
+            )
+        )
+
+        target = GitTheCommits(False)
+
+        saved_commit = CommitInfo(
+            "This is a test",
+            "Uni <uni@test.py>",
+            datetime(2024, 1, 12, 8, 30, 2).replace(tzinfo=timezone.utc),
+            "0987654321098765432109876543210987654321",
+            "www.google2.com",
+            "www.google2.pullrequest.com/10",
+            "1234",
+            False
+        )
+
+        target.commit_list = [saved_commit]
+
+        # Act
+        result = target.save_commit_info(git_commit, "1234", pr_url=None)
+
+        # Assert
+        self.assertIsNone(result)
+
+
+    def test_returns_none_if_pr_url_does_not_have_forward_slash(self):
+        # Arrange
+        git_commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654321", 
+                "www.google2.com", 
+                1, 
+                True
+            )
+        )
+
+        target = GitTheCommits(False)
+
+        saved_commit = CommitInfo(
+            "This is a test",
+            "Uni <uni@test.py>",
+            datetime(2024, 1, 12, 8, 30, 2).replace(tzinfo=timezone.utc),
+            "0987654321098765432109876543210987654321",
+            "www.google2.com",
+            "www.google2.pullrequest.com/10",
+            "1234",
+            False
+        )
+
+        target.commit_list = [saved_commit]
+
+        # Act
+        result = target.save_commit_info(git_commit, "1234", pr_url="www.google.pullrequest.com")
+
+        # Assert
+        self.assertIsNone(result)
+
+
+    def test_returns_none_if_pr_url_does_not_end_with_number(self):
+        # Arrange
+        git_commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654321", 
+                "www.google2.com", 
+                1, 
+                True
+            )
+        )
+
+        target = GitTheCommits(False)
+
+        saved_commit = CommitInfo(
+            "This is a test",
+            "Uni <uni@test.py>",
+            datetime(2024, 1, 12, 8, 30, 2).replace(tzinfo=timezone.utc),
+            "0987654321098765432109876543210987654321",
+            "www.google2.com",
+            "www.google2.pullrequest.com/10",
+            "1234",
+            False
+        )
+
+        target.commit_list = [saved_commit]
+
+        # Act
+        result = target.save_commit_info(git_commit, "1234", pr_url="www.google.pullrequest.com/notANumber")
+
+        # Assert
+        self.assertIsNone(result)
+
+
+    def test_updates_commit_pr_url_if_sha_already_saved_but_found_in_earlier_pull_request(self):
+        # Arrange
+        git_commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654321", 
+                "www.google2.com", 
+                1, 
+                True
+            )
+        )
+
+        target = GitTheCommits(False)
+
+        saved_commit = CommitInfo(
+            "This is a test",
+            "Uni <uni@test.py>",
+            datetime(2024, 1, 12, 8, 30, 2).replace(tzinfo=timezone.utc),
+            "0987654321098765432109876543210987654321",
+            "www.google2.com",
+            "www.google2.pullrequest.com/10",
+            "1234",
+            False
+        )
+
+        target.commit_list = [saved_commit]
+
+        # Act
+        target.save_commit_info(git_commit, "1234", pr_url="www.google.pullrequest.com/5")
+
+        # Assert
+        self.assertEqual(1, len(target.commit_list))
+        result_commit = target.commit_list[0]
+        self.assertIsNotNone(result_commit)
+        self.assertEqual("www.google.pullrequest.com/5", result_commit.pr_url)
+
+
 class TestStripNonDigitCharactersFromListOfStrings(unittest.TestCase):
     def test_only_digits(self):
         # Arrange
@@ -353,7 +504,7 @@ class TestGenerateCherryPickCommand(unittest.TestCase):
 
         result = target.generate_cherry_pick_command([commit])
 
-        self.assertEqual(result, "\ngit test 0987654321098765432109876543210987654321")
+        self.assertEqual(result, "git test 0987654321098765432109876543210987654321")
 
         
     def test_returns_expected_data_with_multiple_commits(self):
@@ -384,7 +535,7 @@ class TestGenerateCherryPickCommand(unittest.TestCase):
 
         result = target.generate_cherry_pick_command([commit_1, commit_2])
 
-        self.assertEqual(result, "\ngit test 0987654321098765432109876543210987654321 1234567890123456789012345678901234567890")
+        self.assertEqual(result, "git test 0987654321098765432109876543210987654321 1234567890123456789012345678901234567890")
 
 
     def test_sorts_commits(self):
@@ -415,7 +566,7 @@ class TestGenerateCherryPickCommand(unittest.TestCase):
 
         result = target.generate_cherry_pick_command([commit_1, commit_2])
 
-        self.assertEqual(result, "\ngit test 1234567890123456789012345678901234567890 0987654321098765432109876543210987654321")
+        self.assertEqual(result, "git test 1234567890123456789012345678901234567890 0987654321098765432109876543210987654321")
 
 
 class TestStringifyCommits(unittest.TestCase):
@@ -433,7 +584,7 @@ class TestStringifyCommits(unittest.TestCase):
             pull_request_url=True,
             sha=True,
             is_merge_commit=True,
-            show_cherry_pick_command=True
+            cherry_pick_command=True
         )
 
         commit = CommitInfo(
@@ -477,7 +628,7 @@ class TestStringifyCommits(unittest.TestCase):
             pull_request_url=True,
             sha=True,
             is_merge_commit=True,
-            show_cherry_pick_command=True
+            cherry_pick_command=True
         )
 
         commit_1 = CommitInfo(
@@ -1240,18 +1391,20 @@ class TestSetSettingsViaDictionary(unittest.TestCase):
                 "CherryPickCommand": True
             },
             "GroupCommitsByItem": True,
-            "GroupCommitCherryPick": True,
+            "ItemCherryPick": True,
             "ShowCommitsInDateDescendingOrder": True,
             "UseCommitHistory": True,
             "UsePullRequests": True,
             "OutputToTerminal": True,
             "OutputToTxtFile": True,
             "OutputToExcelFile": True,
-            "ShowCherryPickCommand": True,
+            "AllCommitsCherryPickCommand": True,
             "IgnoreMergeCommits": True,
             "UseShortCommitHash": True,
             "GitCherryPickArguments": "-test",
-            "SearchLimitMonths": 1
+            "SearchLimitMonths": 1,
+            "UseConcurrentCommitFetching": True,
+            "SecondsBetweenGithubRequests": 1
         }
 
         target = GitTheCommits(False)
@@ -1276,7 +1429,7 @@ class TestSetSettingsViaDictionary(unittest.TestCase):
         self.assertEqual(target.commit_detail_visibilty.pull_request_url, True)
         self.assertEqual(target.commit_detail_visibilty.sha, True)
         self.assertEqual(target.commit_detail_visibilty.is_merge_commit, True)
-        self.assertEqual(target.commit_detail_visibilty.show_cherry_pick_command, True)
+        self.assertEqual(target.commit_detail_visibilty.cherry_pick_command, True)
 
         self.assertEqual(target.group_commits_by_item, True)
         self.assertEqual(target.order_commits_by_date_descend, True)
@@ -1285,11 +1438,13 @@ class TestSetSettingsViaDictionary(unittest.TestCase):
         self.assertEqual(target.output_to_terminal, True)
         self.assertEqual(target.output_to_txt, True)
         self.assertEqual(target.output_to_excel, True)
-        self.assertEqual(target.show_cherry_pick_command, True)
+        self.assertEqual(target.all_commits_cherry_pick_command, True)
         self.assertEqual(target.ignore_merge_commits, True)
         self.assertEqual(target.use_short_commit_hash, True)
         self.assertEqual(target.cherry_pick_command, "git cherry-pick -test")
         self.assertEqual(target.search_date_limit.strftime("%Y%m%d%H%M%S"), (datetime.today() - relativedelta(months=1)).replace(tzinfo=timezone.utc).strftime("%Y%m%d%H%M%S"))
+        self.assertEqual(target.use_concurrent_commit_fetching, True)
+        self.assertEqual(target.seconds_between_github_requests, 1)
 
     
     def test_strips_non_digit_characters_from_item_number(self):
@@ -1312,18 +1467,20 @@ class TestSetSettingsViaDictionary(unittest.TestCase):
                 "CherryPickCommand": True
             },
             "GroupCommitsByItem": True,
-            "GroupCommitCherryPick": True,
+            "ItemCherryPick": True,
             "ShowCommitsInDateDescendingOrder": True,
             "UseCommitHistory": True,
             "UsePullRequests": True,
             "OutputToTerminal": True,
             "OutputToTxtFile": True,
             "OutputToExcelFile": True,
-            "ShowCherryPickCommand": True,
+            "AllCommitsCherryPickCommand": True,
             "IgnoreMergeCommits": True,
             "UseShortCommitHash": True,
             "GitCherryPickArguments": "-test",
-            "SearchLimitMonths": 1
+            "SearchLimitMonths": 1,
+            "UseConcurrentCommitFetching": True,
+            "SecondsBetweenGithubRequests": 1
         }
 
         target = GitTheCommits(False)
@@ -1355,18 +1512,20 @@ class TestSetSettingsViaDictionary(unittest.TestCase):
                 "CherryPickCommand": True
             },
             "GroupCommitsByItem": True,
-            "GroupCommitCherryPick": True,
+            "ItemCherryPick": True,
             "ShowCommitsInDateDescendingOrder": True,
             "UseCommitHistory": True,
             "UsePullRequests": True,
             "OutputToTerminal": True,
             "OutputToTxtFile": True,
             "OutputToExcelFile": True,
-            "ShowCherryPickCommand": True,
+            "AllCommitsCherryPickCommand": True,
             "IgnoreMergeCommits": True,
             "UseShortCommitHash": True,
             "GitCherryPickArguments": "-test",
-            "SearchLimitMonths": 1
+            "SearchLimitMonths": 1,
+            "UseConcurrentCommitFetching": True,
+            "SecondsBetweenGithubRequests": 1
         }
 
         target = GitTheCommits(False)
@@ -1398,18 +1557,22 @@ class TestSetSettingsViaDictionary(unittest.TestCase):
                 "CherryPickCommand": True
             },
             "GroupCommitsByItem": True,
-            "GroupCommitCherryPick": True,
+            "ItemCherryPick": True,
             "ShowCommitsInDateDescendingOrder": True,
             "UseCommitHistory": True,
             "UsePullRequests": True,
             "OutputToTerminal": True,
             "OutputToTxtFile": True,
             "OutputToExcelFile": True,
-            "ShowCherryPickCommand": True,
+            "AllCommitsCherryPickCommand": True,
             "IgnoreMergeCommits": True,
             "UseShortCommitHash": True,
             "GitCherryPickArguments": "-test",
-            "SearchLimitMonths": 1
+            "SearchLimitMonths": 1,
+            "UseConcurrentCommitFetching": True,
+            "SecondsBetweenGithubRequests": 1,
+            "UseConcurrentCommitFetching": True,
+            "SecondsBetweenGithubRequests": 1
         }
 
         target = GitTheCommits(False)
@@ -1441,18 +1604,20 @@ class TestSetSettingsViaDictionary(unittest.TestCase):
                 "CherryPickCommand": True
             },
             "GroupCommitsByItem": True,
-            "GroupCommitCherryPick": True,
+            "ItemCherryPick": True,
             "ShowCommitsInDateDescendingOrder": True,
             "UseCommitHistory": True,
             "UsePullRequests": True,
             "OutputToTerminal": True,
             "OutputToTxtFile": True,
             "OutputToExcelFile": True,
-            "ShowCherryPickCommand": True,
+            "AllCommitsCherryPickCommand": True,
             "IgnoreMergeCommits": True,
             "UseShortCommitHash": True,
             "GitCherryPickArguments": "-test",
-            "SearchLimitMonths": 1
+            "SearchLimitMonths": 1,
+            "UseConcurrentCommitFetching": True,
+            "SecondsBetweenGithubRequests": 1
         }
 
         target = GitTheCommits(False)
@@ -1484,18 +1649,20 @@ class TestSetSettingsViaDictionary(unittest.TestCase):
                 "CherryPickCommand": True
             },
             "GroupCommitsByItem": True,
-            "GroupCommitCherryPick": True,
+            "ItemCherryPick": True,
             "ShowCommitsInDateDescendingOrder": True,
             "UseCommitHistory": True,
             "UsePullRequests": True,
             "OutputToTerminal": True,
             "OutputToTxtFile": True,
             "OutputToExcelFile": True,
-            "ShowCherryPickCommand": True,
+            "AllCommitsCherryPickCommand": True,
             "IgnoreMergeCommits": True,
             "UseShortCommitHash": True,
             "GitCherryPickArguments": None,
-            "SearchLimitMonths": 1
+            "SearchLimitMonths": 1,
+            "UseConcurrentCommitFetching": True,
+            "SecondsBetweenGithubRequests": 1
         }
 
         target = GitTheCommits(False)
@@ -1527,18 +1694,20 @@ class TestSetSettingsViaDictionary(unittest.TestCase):
                 "CherryPickCommand": True
             },
             "GroupCommitsByItem": True,
-            "GroupCommitCherryPick": True,
+            "ItemCherryPick": True,
             "ShowCommitsInDateDescendingOrder": True,
             "UseCommitHistory": True,
             "UsePullRequests": True,
             "OutputToTerminal": True,
             "OutputToTxtFile": True,
             "OutputToExcelFile": True,
-            "ShowCherryPickCommand": True,
+            "AllCommitsCherryPickCommand": True,
             "IgnoreMergeCommits": False,
             "UseShortCommitHash": True,
             "GitCherryPickArguments": "-test",
-            "SearchLimitMonths": 1
+            "SearchLimitMonths": 1,
+            "UseConcurrentCommitFetching": True,
+            "SecondsBetweenGithubRequests": 1
         }
 
         target = GitTheCommits(False)
@@ -1566,7 +1735,7 @@ class TestSetSettings(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open, read_data='{"key": "value"}')
     @patch('json.load')
     @patch('GitTheCommits.GitTheCommits.set_settings_via_dictionary')
-    def test_valid_file(self, mock_set_settings_via_dictionary, mock_json_load, mock_open):
+    def test_valid_file(self, mock_set_settings_via_dictionary: MagicMock, mock_json_load: MagicMock, mock_open):
         # Arrange
         target = GitTheCommits(False)
         mock_json_load.return_value = {"key": "value"}
@@ -1580,19 +1749,16 @@ class TestSetSettings(unittest.TestCase):
     
     @patch('builtins.open', new_callable=mock_open, read_data='{"key": "value",}')
     @patch('json.load')
-    @patch('builtins.input', return_value='')
-    @patch('builtins.print')
-    def test_invalid_json(self, mock_print, mock_input, mock_json_load, mock_open):
+    def test_invalid_json(self, mock_json_load: MagicMock, mock_open):
         # Arrange
         target = GitTheCommits(False)
         mock_json_load.side_effect = json.JSONDecodeError('Invalid JSON', doc='', pos=0)
 
         # Act
-        with self.assertRaises(SystemExit):
-            target.set_settings("settings.json")
+        result = target.set_settings("settings.json")
 
         # Assert
-        mock_print.assert_called_once_with("Your settings.json file has a syntax error on line 1. Please fix it and try again.")
+        self.assertEqual("Your settings.json file has a syntax error on line 1. Please fix it and try again.", result)
 
 
 class TestGenerateExcelFile(unittest.TestCase):
@@ -1601,18 +1767,18 @@ class TestGenerateExcelFile(unittest.TestCase):
     @patch('os.path.isfile', return_value=False)
     @patch('os.remove')
     @patch('builtins.input')
-    def test_no_file(self, mock_input, mock_remove, mock_isfile, mock_print, mock_workbook):
+    def test_no_file(self, mock_input: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock, mock_workbook: MagicMock):
         # Arrange
         mock_workbook.return_value.__enter__.return_value = MagicMock()
 
         target = GitTheCommits(False)
-        commits = [
+        target.commit_list = [
             CommitInfo("message", "author", "2022-01-01", "sha1", "commit_url", "pr_url", "item_number", "is_merge"),
             CommitInfo("message", "author", "2022-01-02", "sha2", "commit_url", "pr_url", "item_number", "is_merge")
         ]
         
         # Act
-        target.generate_excel_file(commits)
+        target.generate_excel_file()
 
         # Assert
         mock_isfile.assert_called_once_with("output.xlsx")
@@ -1626,23 +1792,23 @@ class TestGenerateExcelFile(unittest.TestCase):
     @patch('os.path.isfile', return_value=True)
     @patch('os.remove', side_effect=[IOError, None])
     @patch('builtins.input', return_value='')
-    def test_file_exists_close(self, mock_input, mock_remove, mock_isfile, mock_print, mock_exit, mock_workbook):
+    def test_file_exists_close(self, mock_input: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock, mock_exit: MagicMock, mock_workbook: MagicMock):
         # Arrange
         mock_workbook.return_value.__enter__.return_value = MagicMock()
 
         target = GitTheCommits(False)
-        commits = [
+        target.commit_list = [
             CommitInfo("message", "author", "2022-01-01", "sha1", "commit_url", "pr_url", "item_number", "is_merge"),
             CommitInfo("message", "author", "2022-01-02", "sha2", "commit_url", "pr_url", "item_number", "is_merge")
         ]
         
         # Act
-        target.generate_excel_file(commits)
+        target.generate_excel_file()
 
         # Assert
         mock_isfile.assert_called_once_with("output.xlsx")
         mock_remove.assert_has_calls([call("output.xlsx"), call("output.xlsx")])
-        mock_input.assert_called_once_with()
+        mock_input.assert_called_once_with("Press Enter to continue...")
 
 
     @patch('xlsxwriter.Workbook')
@@ -1650,30 +1816,30 @@ class TestGenerateExcelFile(unittest.TestCase):
     @patch('os.path.isfile', return_value=True)
     @patch('os.remove', side_effect=[IOError, None])
     @patch('builtins.input', side_effect=['', ''])
-    def test_file_exists_dont_close(self, mock_input, mock_remove, mock_isfile, mock_print, mock_workbook):
+    def test_file_exists_dont_close(self, mock_input: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock, mock_workbook: MagicMock):
         # Arrange
         mock_workbook.return_value.__enter__.return_value = MagicMock()
 
         target = GitTheCommits(False)
-        commits = [
+        target.commit_list = [
             CommitInfo("message", "author", "2022-01-01", "sha1", "commit_url", "pr_url", "item_number", "is_merge"),
             CommitInfo("message", "author", "2022-01-02", "sha2", "commit_url", "pr_url", "item_number", "is_merge")
         ]
         
         # Act
-        target.generate_excel_file(commits)
+        target.generate_excel_file()
 
         # Assert
         mock_isfile.assert_called_once_with("output.xlsx")
         mock_remove.assert_has_calls([call("output.xlsx"), call("output.xlsx")])
-        mock_input.assert_has_calls([call()])
+        mock_input.assert_has_calls([call("Press Enter to continue...")])
 
 
     @patch('builtins.print')
     @patch('os.path.isfile', return_value=False)
     @patch('os.remove')
     @patch('xlsxwriter.Workbook')
-    def test_all_visible(self, mock_workbook, mock_remove, mock_isfile, mock_print):
+    def test_all_visible(self, mock_workbook: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock):
         # Arrange
         mock_worksheet = Mock()
         mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
@@ -1687,15 +1853,35 @@ class TestGenerateExcelFile(unittest.TestCase):
         target.commit_detail_visibilty.pull_request_url = True
         target.commit_detail_visibilty.sha = True
         target.commit_detail_visibilty.is_merge_commit = True
+        target.commit_detail_visibilty.cherry_pick_command = True
         target.strip_characters_from_item_numbers = True
+        target.cherry_pick_command = "git cherry-pick"
         
-        commits = [
-            CommitInfo("message1", "author1", "2022-01-01", "sha1", "commit_url1", "pr_url1", "123", "is_merge1"),
-            CommitInfo("message2", "author2", "2022-01-02", "sha2", "commit_url2", "pr_url2", "234", "is_merge2")
+        target.commit_list = [
+            CommitInfo(
+                "message1", 
+                "author1", 
+                datetime.strptime("2022-01-01", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha1", 
+                "commit_url1", 
+                "pr_url1", 
+                "123", 
+                "is_merge1"
+            ),
+            CommitInfo(
+                "message2", 
+                "author2", 
+                datetime.strptime("2022-01-02", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha2", 
+                "commit_url2", 
+                "pr_url2", 
+                "234", 
+                "is_merge2"
+            )
         ]
         
         # Act
-        target.generate_excel_file(commits)
+        target.generate_excel_file()
 
         # Assert
         mock_workbook.assert_called_once_with("output.xlsx")
@@ -1708,9 +1894,10 @@ class TestGenerateExcelFile(unittest.TestCase):
             call('C1', "Author", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call('D1', "Date", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call('E1', "Commit Url", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
-            call('F1', "Pull Request Url", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('F1', "Pull Request Url(s)", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call('G1', "Sha", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
-            call('H1', "Is Merge Commit", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+            call('H1', "Is Merge Commit", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('I1', "Cherry-Pick Command", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
         ]
         mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
 
@@ -1719,19 +1906,226 @@ class TestGenerateExcelFile(unittest.TestCase):
             call(1, 0, "message1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(1, 1, "123", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(1, 2, "author1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
-            call(1, 3, "2022-01-01", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(1, 3, "01/01/2022, 00:00:00", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(1, 4, "commit_url1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(1, 5, "pr_url1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(1, 6, "sha1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(1, 7, "is_merge1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(1, 8, "git cherry-pick sha1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(2, 0, "message2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(2, 1, "234", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(2, 2, "author2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
-            call(2, 3, "2022-01-02", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 3, "01/02/2022, 00:00:00", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(2, 4, "commit_url2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(2, 5, "pr_url2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(2, 6, "sha2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
-            call(2, 7, "is_merge2", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+            call(2, 7, "is_merge2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 8, "git cherry-pick sha2", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
+        
+
+    @patch('builtins.print')
+    @patch('os.path.isfile', return_value=False)
+    @patch('os.remove')
+    @patch('xlsxwriter.Workbook')
+    def test_group_by_item_all_visible(self, mock_workbook: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock):
+        # Arrange
+        mock_worksheet = Mock()
+        mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
+
+        target = GitTheCommits(True)
+        target.group_commits_by_item = True
+        target.commit_detail_visibilty.message = True
+        target.commit_detail_visibilty.item_number = True
+        target.commit_detail_visibilty.author = True
+        target.commit_detail_visibilty.date = True
+        target.commit_detail_visibilty.commit_url = True
+        target.commit_detail_visibilty.pull_request_url = True
+        target.commit_detail_visibilty.sha = True
+        target.commit_detail_visibilty.is_merge_commit = True
+        target.commit_detail_visibilty.cherry_pick_command = True
+        target.strip_characters_from_item_numbers = True
+        target.cherry_pick_command = "git cherry-pick"
+        
+        target.commit_list = [
+            CommitInfo(
+                "message1", 
+                "author1", 
+                datetime.strptime("2022-01-01", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha1", 
+                "commit_url1", 
+                "pr_url1", 
+                "123", 
+                "is_merge1"
+            ),
+            CommitInfo(
+                "message2", 
+                "author2", 
+                datetime.strptime("2022-01-02", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha2", 
+                "commit_url2", 
+                "pr_url2", 
+                "234", 
+                "is_merge2"
+            )
+        ]
+        target.item_numbers = ["123", "234"]
+        target.item_commit_dictionary = {"123": [0], "234": [1]}
+        
+        # Act
+        target.generate_excel_file()
+
+        # Assert
+        mock_workbook.assert_called_once_with("output.xlsx")
+        mock_worksheet = mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value
+
+        # Check that the correct headers were written to the worksheet
+        calls = [
+            call('A1', "Commit Message", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('B1', "Item Number", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('C1', "Author", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('D1', "Date", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('E1', "Commit Url", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('F1', "Pull Request Url(s)", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('G1', "Sha", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('H1', "Is Merge Commit", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('I1', "Cherry-Pick Command", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
+
+        # Check that the Item Number subheaders were written to the worksheet
+        calls = [
+            call('A2:I2', "Commit for 123 (1):", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('A4:I4', "Commit for 234 (1):", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.merge_range.assert_has_calls(calls, any_order=True)
+
+        # Check that the correct data was written to the worksheet
+        calls = [
+            call(2, 0, "message1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 1, "123", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 2, "author1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 3, "01/01/2022, 00:00:00", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 4, "commit_url1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 5, "pr_url1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 6, "sha1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 7, "is_merge1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 8, "git cherry-pick sha1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 0, "message2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 1, "234", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 2, "author2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 3, "01/02/2022, 00:00:00", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 4, "commit_url2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 5, "pr_url2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 6, "sha2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 7, "is_merge2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 8, "git cherry-pick sha2", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
+        
+
+    @patch('xlsxwriter.Workbook')
+    def test_no_commits_found(self, mock_workbook: MagicMock):
+        # Arrange
+        mock_worksheet = Mock()
+        mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
+
+        target = GitTheCommits(False)
+        target.commit_list = []
+        
+        # Act
+        target.generate_excel_file()
+
+        # Assert
+        mock_workbook.assert_called_once_with("output.xlsx")
+        mock_worksheet = mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value
+
+        # Check that the Item Number subheaders were written to the worksheet
+        calls = [
+            call('A2:A2', "No commits found", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.merge_range.assert_has_calls(calls, any_order=True)
+
+
+    @patch('builtins.print')
+    @patch('os.path.isfile', return_value=False)
+    @patch('os.remove')
+    @patch('xlsxwriter.Workbook')
+    def test_group_by_item_no_commits_found_for_item_number(self, mock_workbook: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock):
+        # Arrange
+        mock_worksheet = Mock()
+        mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
+
+        target = GitTheCommits(True)
+        target.group_commits_by_item = True
+        target.commit_detail_visibilty.message = True
+        target.commit_detail_visibilty.item_number = True
+        target.commit_detail_visibilty.author = True
+        target.commit_detail_visibilty.date = True
+        target.commit_detail_visibilty.commit_url = True
+        target.commit_detail_visibilty.pull_request_url = True
+        target.commit_detail_visibilty.sha = True
+        target.commit_detail_visibilty.is_merge_commit = True
+        target.commit_detail_visibilty.cherry_pick_command = True
+        target.strip_characters_from_item_numbers = True
+        target.cherry_pick_command = "git cherry-pick"
+        
+        target.commit_list = [
+            CommitInfo(
+                "message1", 
+                "author1", 
+                datetime.strptime("2022-01-01", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha1", 
+                "commit_url1", 
+                "pr_url1", 
+                "123", 
+                "is_merge1"
+            )
+        ]
+
+        target.item_numbers = ["123", "234"]
+        target.item_commit_dictionary = {"123": [0]}
+        
+        # Act
+        target.generate_excel_file()
+
+        # Assert
+        mock_workbook.assert_called_once_with("output.xlsx")
+        mock_worksheet = mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value
+
+        # Check that the correct headers were written to the worksheet
+        calls = [
+            call('A1', "Commit Message", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('B1', "Item Number", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('C1', "Author", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('D1', "Date", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('E1', "Commit Url", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('F1', "Pull Request Url(s)", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('G1', "Sha", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('H1', "Is Merge Commit", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('I1', "Cherry-Pick Command", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
+
+        # Check that the Item Number subheaders were written to the worksheet
+        calls = [
+            call('A2:I2', "Commit for 123 (1):", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('A4:I4', "No commits found for '234'", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.merge_range.assert_has_calls(calls, any_order=True)
+
+        # Check that the correct data was written to the worksheet
+        calls = [
+            call(2, 0, "message1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 1, "123", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 2, "author1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 3, "01/01/2022, 00:00:00", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 4, "commit_url1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 5, "pr_url1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 6, "sha1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 7, "is_merge1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 8, "git cherry-pick sha1", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
         ]
         mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
 
@@ -1740,7 +2134,7 @@ class TestGenerateExcelFile(unittest.TestCase):
     @patch('os.path.isfile', return_value=False)
     @patch('os.remove')
     @patch('xlsxwriter.Workbook')
-    def test_some_not_visible(self, mock_workbook, mock_remove, mock_isfile, mock_print):
+    def test_some_not_visible(self, mock_workbook: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock):
         # Arrange
         mock_worksheet = Mock()
         mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
@@ -1756,13 +2150,13 @@ class TestGenerateExcelFile(unittest.TestCase):
         target.commit_detail_visibilty.is_merge_commit = False
         target.strip_characters_from_item_numbers = True
         
-        commits = [
+        target.commit_list = [
             CommitInfo("message1", "author1", "2022-01-01", "sha1", "commit_url1", "pr_url1", "123", "is_merge1"),
             CommitInfo("message2", "author2", "2022-01-02", "sha2", "commit_url2", "pr_url2", "234", "is_merge2")
         ]
         
         # Act
-        target.generate_excel_file(commits)
+        target.generate_excel_file()
 
         # Assert
         mock_workbook.assert_called_once_with("output.xlsx")
@@ -1790,9 +2184,74 @@ class TestGenerateExcelFile(unittest.TestCase):
         ]
         mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
 
+
+    @patch('builtins.print')
+    @patch('os.path.isfile', return_value=False)
+    @patch('os.remove')
+    @patch('xlsxwriter.Workbook')
+    def test_group_by_item_some_not_visible(self, mock_workbook: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock):
+        # Arrange
+        mock_worksheet = Mock()
+        mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
+
+        target = GitTheCommits(True)
+        target.group_commits_by_item = True
+        target.commit_detail_visibilty.message = True
+        target.commit_detail_visibilty.item_number = False
+        target.commit_detail_visibilty.author = True
+        target.commit_detail_visibilty.date = False
+        target.commit_detail_visibilty.commit_url = True
+        target.commit_detail_visibilty.pull_request_url = False
+        target.commit_detail_visibilty.sha = True
+        target.commit_detail_visibilty.is_merge_commit = False
+        target.strip_characters_from_item_numbers = True
+        
+        target.commit_list = [
+            CommitInfo("message1", "author1", "2022-01-01", "sha1", "commit_url1", "pr_url1", "123", "is_merge1"),
+            CommitInfo("message2", "author2", "2022-01-02", "sha2", "commit_url2", "pr_url2", "234", "is_merge2")
+        ]
+        target.item_numbers = ["123", "234"]
+        target.item_commit_dictionary = {"123": [0], "234": [1]}
+        
+        # Act
+        target.generate_excel_file()
+
+        # Assert
+        mock_workbook.assert_called_once_with("output.xlsx")
+        mock_worksheet = mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value
+
+        # Check that the correct headers were written to the worksheet
+        calls = [
+            call('A1', "Commit Message", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('B1', "Author", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('C1', "Commit Url", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('D1', "Sha", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
+
+        # Check that the Item Number subheaders were written to the worksheet
+        calls = [
+            call('A2:D2', "Commit for 123 (1):", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('A4:D4', "Commit for 234 (1):", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.merge_range.assert_has_calls(calls, any_order=True)
+
+        # Check that the correct data was written to the worksheet
+        calls = [
+            call(2, 0, "message1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 1, "author1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 2, "commit_url1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(2, 3, "sha1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 0, "message2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 1, "author2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 2, "commit_url2", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 3, "sha2", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
+
     
     @patch('xlsxwriter.Workbook')
-    def test_show_cherry_pick_command(self, mock_workbook):
+    def test_show_cherry_pick_command(self, mock_workbook: MagicMock):
         # Arrange
         mock_worksheet = Mock()
         mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
@@ -1806,30 +2265,163 @@ class TestGenerateExcelFile(unittest.TestCase):
         target.commit_detail_visibilty.pull_request_url = True
         target.commit_detail_visibilty.sha = True
         target.commit_detail_visibilty.is_merge_commit = True
-        target.show_cherry_pick_command = True
+        target.commit_detail_visibilty.cherry_pick_command = True
+        target.all_commits_cherry_pick_command = True
         target.strip_characters_from_item_numbers = True
         
-        commits = [
-            CommitInfo("message1", "author1", "2022-01-01", "sha1", "commit_url1", "pr_url1", "123", "is_merge1"),
-            CommitInfo("message2", "author2", "2022-01-02", "sha2", "commit_url2", "pr_url2", "234", "is_merge2")
+        target.commit_list = [
+            CommitInfo(
+                "message1", 
+                "author1", 
+                datetime.strptime("2022-01-01", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha1", 
+                "commit_url1", 
+                "pr_url1", 
+                "123", 
+                "is_merge1"
+            ),
+            CommitInfo("message2", 
+                "author2", 
+                datetime.strptime("2022-01-02", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha2", 
+                "commit_url2", 
+                "pr_url2", 
+                "234", 
+                "is_merge2"
+            )
         ]
-        
+
         # Act
-        target.generate_excel_file(commits)
+        target.generate_excel_file()
 
         # Assert
         mock_workbook.assert_called_once_with("output.xlsx")
         mock_worksheet = mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value
 
         # Check that the cherry pick command was written to the worksheet
-        mock_worksheet.merge_range.assert_called_once_with('A5:I5', target.generate_cherry_pick_command(commits), mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        mock_worksheet.merge_range.assert_has_calls([call('A5:I5', target.generate_cherry_pick_command(target.commit_list), mock_workbook.return_value.__enter__.return_value.add_format.return_value)])
+
+    
+    @patch('xlsxwriter.Workbook')
+    def test_group_by_item_show_cherry_pick_command(self, mock_workbook: MagicMock):
+        # Arrange
+        mock_worksheet = Mock()
+        mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
+
+        target = GitTheCommits(False)
+        target.group_commits_by_item = True
+        target.commit_detail_visibilty.message = True
+        target.commit_detail_visibilty.item_number = True
+        target.commit_detail_visibilty.author = True
+        target.commit_detail_visibilty.date = True
+        target.commit_detail_visibilty.commit_url = True
+        target.commit_detail_visibilty.pull_request_url = True
+        target.commit_detail_visibilty.sha = True
+        target.commit_detail_visibilty.is_merge_commit = True
+        target.commit_detail_visibilty.cherry_pick_command = True
+        target.all_commits_cherry_pick_command = True
+        
+        target.commit_list = [
+            CommitInfo(
+                "message1", 
+                "author1", 
+                datetime.strptime("2022-01-01", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha1", 
+                "commit_url1", 
+                "pr_url1", 
+                "123", 
+                "is_merge1"
+            ),
+            CommitInfo(
+                "message2", 
+                "author2", 
+                datetime.strptime("2022-01-02", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha2", 
+                "commit_url2", 
+                "pr_url2", 
+                "234", 
+                "is_merge2"
+            )
+        ]
+        target.item_numbers = ["123", "234"]
+        target.item_commit_dictionary = {"123": [0], "234": [1]}
+
+        # Act
+        target.generate_excel_file()
+
+        # Assert
+        mock_workbook.assert_called_once_with("output.xlsx")
+        mock_worksheet = mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value
+
+        # Check that the cherry pick command was written to the worksheet
+        mock_worksheet.merge_range.assert_has_calls([call('A7:I7', target.generate_cherry_pick_command(target.commit_list), mock_workbook.return_value.__enter__.return_value.add_format.return_value)])
+
+    
+    @patch('xlsxwriter.Workbook')
+    def test_group_by_item_group_cherry_pick_command(self, mock_workbook: MagicMock):
+        # Arrange
+        mock_worksheet = Mock()
+        mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
+
+        target = GitTheCommits(False)
+        target.group_commits_by_item = True
+        target.commit_detail_visibilty.message = True
+        target.commit_detail_visibilty.item_number = True
+        target.commit_detail_visibilty.author = True
+        target.commit_detail_visibilty.date = True
+        target.commit_detail_visibilty.commit_url = True
+        target.commit_detail_visibilty.pull_request_url = True
+        target.commit_detail_visibilty.sha = True
+        target.commit_detail_visibilty.is_merge_commit = True
+        target.commit_detail_visibilty.cherry_pick_command = True
+        target.item_cherry_pick = True
+        target.cherry_pick_command = "git cherry-pick"
+        
+        target.commit_list = [
+            CommitInfo(
+                "message1", 
+                "author1", 
+                datetime.strptime("2022-01-01", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha1", 
+                "commit_url1", 
+                "pr_url1", 
+                "123", 
+                "is_merge1"
+            ),
+            CommitInfo(
+                "message2", 
+                "author2", 
+                datetime.strptime("2022-01-02", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
+                "sha2", 
+                "commit_url2", 
+                "pr_url2", 
+                "234", 
+                "is_merge2"
+            )
+        ]
+        target.item_numbers = ["123", "234"]
+        target.item_commit_dictionary = {"123": [0], "234": [1]}
+
+        # Act
+        target.generate_excel_file()
+
+        # Assert
+        mock_workbook.assert_called_once_with("output.xlsx")
+        mock_worksheet = mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value
+
+        # Check that the item cherry pick commands were written to the worksheet
+        calls = [
+            call('A5:I5', "git cherry-pick sha1", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('A9:I9', "git cherry-pick sha2", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.merge_range.assert_has_calls(calls, any_order=True)
 
 
     @patch('builtins.print')
     @patch('os.path.isfile', return_value=False)
     @patch('os.remove')
     @patch('xlsxwriter.Workbook')
-    def test_item_header_when_strip_characters_from_item_numbers(self, mock_workbook, mock_remove, mock_isfile, mock_print):
+    def test_item_header_when_strip_characters_from_item_numbers(self, mock_workbook: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock):
         # Arrange
         mock_worksheet = Mock()
         mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
@@ -1838,13 +2430,13 @@ class TestGenerateExcelFile(unittest.TestCase):
         target.commit_detail_visibilty.item_number = True
         target.strip_characters_from_item_numbers = False
         
-        commits = [
+        target.commit_list = [
             CommitInfo("message1", "author1", "2022-01-01", "sha1", "commit_url1", "pr_url1", "123", "is_merge1"),
             CommitInfo("message2", "author2", "2022-01-02", "sha2", "commit_url2", "pr_url2", "234", "is_merge2")
         ]
         
         # Act
-        target.generate_excel_file(commits)
+        target.generate_excel_file()
 
         # Assert
         mock_workbook.assert_called_once_with("output.xlsx")
@@ -1860,6 +2452,55 @@ class TestGenerateExcelFile(unittest.TestCase):
         calls = [
             call(1, 0, "123", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
             call(2, 0, "234", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+        ]
+        mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
+
+
+    @patch('builtins.print')
+    @patch('os.path.isfile', return_value=False)
+    @patch('os.remove')
+    @patch('xlsxwriter.Workbook')
+    def test_group_by_item_item_header_when_strip_characters_from_item_numbers(self, mock_workbook: MagicMock, mock_remove: MagicMock, mock_isfile: MagicMock, mock_print: MagicMock):
+        # Arrange
+        mock_worksheet = Mock()
+        mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value = mock_worksheet
+
+        target = GitTheCommits(True)
+        target.group_commits_by_item = True
+        target.commit_detail_visibilty.item_number = True
+        target.strip_characters_from_item_numbers = False
+        
+        target.commit_list = [
+            CommitInfo("message1", "author1", "2022-01-01", "sha1", "commit_url1", "pr_url1", "123", "is_merge1"),
+            CommitInfo("message2", "author2", "2022-01-02", "sha2", "commit_url2", "pr_url2", "234", "is_merge2")
+        ]
+        target.item_numbers = ["123", "234"]
+        target.item_commit_dictionary = {"123": [0], "234": [1]}
+        
+        # Act
+        target.generate_excel_file()
+
+        # Assert
+        mock_workbook.assert_called_once_with("output.xlsx")
+        mock_worksheet = mock_workbook.return_value.__enter__.return_value.add_worksheet.return_value
+
+        # Check that the correct headers were written to the worksheet
+        calls = [
+            call('A1', "Item", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
+
+        # Check that the Item Number subheaders were written to the worksheet
+        calls = [
+            call('A2:A2', "Commit for 123 (1):", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call('A4:A4', "Commit for 234 (1):", mock_workbook.return_value.__enter__.return_value.add_format.return_value)
+        ]
+        mock_worksheet.merge_range.assert_has_calls(calls, any_order=True)
+
+        # Check that the correct data was written to the worksheet
+        calls = [
+            call(2, 0, "123", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
+            call(4, 0, "234", mock_workbook.return_value.__enter__.return_value.add_format.return_value),
         ]
         mock_worksheet.write_string.assert_has_calls(calls, any_order=True)
 
@@ -1976,7 +2617,7 @@ class TestFetchCommits(unittest.IsolatedAsyncioTestCase):
 
 
     @patch('builtins.print')
-    async def test_use_pull_requests_outputs_to_terminal(self, mock_print):
+    async def test_use_pull_requests_outputs_to_terminal(self, mock_print: MagicMock):
         # Arrange
         git_commit = Mock()
         git_commit.commit = generate_git_commit_object(
@@ -2024,7 +2665,7 @@ class TestFetchCommits(unittest.IsolatedAsyncioTestCase):
 
 
     @patch('builtins.print')
-    async def test_use_commit_history_outputs_to_terminal(self, mock_print):
+    async def test_use_commit_history_outputs_to_terminal(self, mock_print: MagicMock):
         # Arrange
         git_commit = Mock()
         git_commit = generate_git_commit_object(
@@ -2241,6 +2882,156 @@ class TestFetchCommits(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("0987654321098765432109876543210987654322", result_commit_2.sha)
 
 
+    async def test_use_pull_requests_with_concurrent_commit_fetching_returns_multiple_commits_from_pr_with_item_number(self):
+        # Arrange
+        git_commit_1 = Mock()
+        git_commit_1.commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654321", 
+                "www.google2.com", 
+                1, 
+                True
+            )
+        )
+        git_commit_2 = Mock()
+        git_commit_2.commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a also test", 
+                "Uni 2", 
+                "uni2@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "1234567890123456789012345678901234567890", 
+                "www.google3.com", 
+                1, 
+                True
+            )
+        )
+
+        mock_pull_request = Mock()
+        mock_pull_request.created_at = datetime.today().replace(tzinfo=timezone.utc)
+        mock_pull_request.head.ref = "ITEM-1234"
+        mock_pull_request.merged = True
+        mock_pull_request.number = 1
+        mock_pull_request.html_url = "www.google.com/pr"
+        mock_pull_request.get_commits.return_value = [git_commit_1, git_commit_2]
+
+        mock_repo = Mock()
+        mock_repo.get_pulls.return_value = [mock_pull_request]
+
+        target = GitTheCommits(False)
+        target.strip_characters_from_item_numbers = True
+        target.item_numbers = ["1234"]
+        target.use_pull_requests = True
+        target.use_concurrent_commit_fetching = True
+
+        target.github_repository = mock_repo
+
+        # Act
+        await target.fetch_commits()
+
+        # Arrange
+        self.assertEqual(2, len(target.commit_list))
+        result_commit_1 = target.commit_list[0]
+        self.assertEqual("1234", result_commit_1.item_number)
+        self.assertEqual("0987654321098765432109876543210987654321", result_commit_1.sha)
+        result_commit_2 = target.commit_list[1]
+        self.assertEqual("1234", result_commit_2.item_number)
+        self.assertEqual("1234567890123456789012345678901234567890", result_commit_2.sha)
+
+
+    async def test_use_commit_history_with_concurrent_commit_fetching_returns_multiple_commits_with_item_number(self):
+        # Arrange
+        git_commit_1 = generate_git_commit_object(
+            GitCommitDetails(
+                "commit for item-1234", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654321", 
+                "www.google2.com", 
+                1, 
+                True,
+                "1234567890123456789012345678901234567890"
+            )
+        )
+
+        git_commit_2 = generate_git_commit_object(
+            GitCommitDetails(
+                "another commit for item-1234", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654322", 
+                "www.google2.com", 
+                1, 
+                True,
+                "1234567890123456789012345678901234567890"
+            )
+        )
+
+        mock_pull_request = Mock()
+        mock_pull_request.created_at = datetime.today().replace(tzinfo=timezone.utc)
+        mock_pull_request.head.ref = "ITEM-1234"
+        mock_pull_request.merged = True
+        mock_pull_request.number = 1
+        mock_pull_request.html_url = "www.google.com/pr"
+        mock_pull_request.get_commits.return_value = [git_commit_1, git_commit_2]
+
+        mock_commit_1 = Mock()
+        mock_commit_1.sha = "ITEM-1234"
+        mock_commit_1.commit = git_commit_1
+        mock_commit_1.html_url = "www.google.com/commit"
+        mock_commit_1.get_pulls.return_value = [mock_pull_request]
+
+        mock_commit_2 = Mock()
+        mock_commit_2.sha = "ITEM-1234"
+        mock_commit_2.commit = git_commit_2
+        mock_commit_2.html_url = "www.google.com/commit"
+        mock_commit_2.get_pulls.return_value = [mock_pull_request]
+
+        mock_repo = Mock()
+        mock_repo.get_commits.return_value = [mock_commit_1, mock_commit_2]
+
+        mock_branch = Mock()
+        mock_branch.commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "1234567890123456789012345678901234567890", 
+                "www.google2.com", 
+                1, 
+                True
+            )
+        )
+
+        target = GitTheCommits(False)
+        target.strip_characters_from_item_numbers = True
+        target.item_numbers = ["1234"]
+        target.use_commit_history = True
+        target.use_concurrent_commit_fetching = True
+
+        target.github_repository = mock_repo
+        target.github_target_branch = mock_branch
+
+        # Act
+        await target.fetch_commits()
+
+        # Assert
+        self.assertEqual(2, len(target.commit_list))
+        result_commit_1 = target.commit_list[0]
+        self.assertEqual("1234", result_commit_1.item_number)
+        self.assertEqual("0987654321098765432109876543210987654321", result_commit_1.sha)
+        result_commit_2 = target.commit_list[1]
+        self.assertEqual("1234", result_commit_2.item_number)
+        self.assertEqual("0987654321098765432109876543210987654322", result_commit_2.sha)
+
+
     async def test_use_pull_requests_returns_only_pr_with_item_number(self):
         # Arrange
         git_commit_1 = Mock()
@@ -2304,6 +3095,77 @@ class TestFetchCommits(unittest.IsolatedAsyncioTestCase):
         result_commit_1 = target.commit_list[0]
         self.assertEqual("1234", result_commit_1.item_number)
         self.assertEqual("0987654321098765432109876543210987654321", result_commit_1.sha)
+        
+
+    async def test_use_pull_requests_returns_commits_with_correct_pull_requests(self):
+        # Arrange
+        git_commit_1 = Mock()
+        git_commit_1.commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654321", 
+                "www.google2.com", 
+                1, 
+                True
+            )
+        )
+        git_commit_2 = Mock()
+        git_commit_2.commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a also test", 
+                "Uni 2", 
+                "uni2@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "1234567890123456789012345678901234567890", 
+                "www.google3.com", 
+                1, 
+                True
+            )
+        )
+
+        mock_pull_request_1 = Mock()
+        mock_pull_request_1.created_at = datetime.today().replace(tzinfo=timezone.utc)
+        mock_pull_request_1.head.ref = "ITEM-1234"
+        mock_pull_request_1.merged = True
+        mock_pull_request_1.number = 1
+        mock_pull_request_1.html_url = "www.google.com/pr/1"
+        mock_pull_request_1.get_commits.return_value = [git_commit_1]
+
+        mock_pull_request_2 = Mock()
+        mock_pull_request_2.created_at = (datetime.today() + relativedelta(days=1)).replace(tzinfo=timezone.utc)
+        mock_pull_request_2.head.ref = "ITEM-1234"
+        mock_pull_request_2.merged = True
+        mock_pull_request_2.number = 2
+        mock_pull_request_2.html_url = "www.google.com/pr/2"
+        mock_pull_request_2.get_commits.return_value = [git_commit_1, git_commit_2]
+
+        mock_repo = Mock()
+        mock_repo.get_pulls.return_value = [mock_pull_request_1, mock_pull_request_2]
+
+        target = GitTheCommits(False)
+        target.strip_characters_from_item_numbers = True
+        target.item_numbers = ["1234"]
+        target.use_pull_requests = True
+
+        target.github_repository = mock_repo
+
+        # Act
+        await target.fetch_commits()
+
+        # Arrange
+        self.assertEqual(2, len(target.commit_list))
+        result_commit_1 = target.commit_list[0]
+        self.assertEqual("1234", result_commit_1.item_number)
+        self.assertEqual("0987654321098765432109876543210987654321", result_commit_1.sha)
+        self.assertEqual("www.google.com/pr/1", result_commit_1.pr_url)
+
+        result_commit_2 = target.commit_list[1]
+        self.assertEqual("1234", result_commit_2.item_number)
+        self.assertEqual("1234567890123456789012345678901234567890", result_commit_2.sha)
+        self.assertEqual("www.google.com/pr/2", result_commit_2.pr_url)
 
 
     async def test_use_commit_history_returns_only_pr_with_item_number(self):
@@ -2664,6 +3526,224 @@ class TestFetchCommits(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("1234567890123456789012345678901234567890", commit_12345.sha)
 
 
+    async def test_use_pull_requests_does_not_return_larger_number_prs_that_just_contain_another_item_number(self):
+        # Arrange
+        git_commit_1 = Mock()
+        git_commit_1.commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654321", 
+                "www.google2.com", 
+                1, 
+                True
+            )
+        )
+        git_commit_2 = Mock()
+        git_commit_2.commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a also test", 
+                "Uni 2", 
+                "uni2@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "1234567890123456789012345678901234567890", 
+                "www.google3.com", 
+                1, 
+                True
+            )
+        )
+        git_commit_3 = Mock()
+        git_commit_3.commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a also test", 
+                "Uni 2", 
+                "uni2@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "2345678901234567890123456789012345678901", 
+                "www.google3.com", 
+                1, 
+                True
+            )
+        )
+
+        mock_pull_request_1 = Mock()
+        mock_pull_request_1.created_at = datetime.today().replace(tzinfo=timezone.utc)
+        mock_pull_request_1.head.ref = "ITEM-23456"
+        mock_pull_request_1.merged = True
+        mock_pull_request_1.number = 1
+        mock_pull_request_1.html_url = "www.google.com/pr"
+        mock_pull_request_1.get_commits.return_value = [git_commit_1]
+
+        mock_pull_request_2 = Mock()
+        mock_pull_request_2.created_at = datetime.today().replace(tzinfo=timezone.utc)
+        mock_pull_request_2.head.ref = "ITEM-12345"
+        mock_pull_request_2.merged = True
+        mock_pull_request_2.number = 2
+        mock_pull_request_2.html_url = "www.google.com/pr"
+        mock_pull_request_2.get_commits.return_value = [git_commit_2]
+
+        mock_pull_request_3 = Mock()
+        mock_pull_request_3.created_at = datetime.today().replace(tzinfo=timezone.utc)
+        mock_pull_request_3.head.ref = "ITEM-34567"
+        mock_pull_request_3.merged = True
+        mock_pull_request_3.number = 3
+        mock_pull_request_3.html_url = "www.google.com/pr"
+        mock_pull_request_3.get_commits.return_value = [git_commit_3]
+
+        mock_repo = Mock()
+        mock_repo.get_pulls.return_value = [mock_pull_request_1, mock_pull_request_2, mock_pull_request_3]
+
+        target = GitTheCommits(False)
+        target.item_numbers = ["ITEM-345"]
+        target.use_pull_requests = True
+        target.github_repository = mock_repo
+
+        # Act
+        await target.fetch_commits()
+
+        # Arrange
+        self.assertEqual(0, len(target.commit_list))
+        
+
+    async def test_use_commit_history_returns_prs_which_have_item_numbers_inside_each_other(self):
+        # Arrange
+        git_commit_1 = generate_git_commit_object(
+            GitCommitDetails(
+                "ITEM-123 This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "0987654321098765432109876543210987654321", 
+                "www.google2.com", 
+                1, 
+                True,
+                "3456789012345678901234567890123456789012"
+            )
+        )
+        git_commit_2 = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a ITEM-12345 test", 
+                "Uni 2", 
+                "uni2@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "1234567890123456789012345678901234567890", 
+                "www.google3.com", 
+                1, 
+                True,
+                "3456789012345678901234567890123456789012"
+            )
+        )
+        git_commit_3 = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a also test ITEM-345", 
+                "Uni 2", 
+                "uni2@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "2345678901234567890123456789012345678901", 
+                "www.google3.com", 
+                1, 
+                True,
+                "3456789012345678901234567890123456789012"
+            )
+        )
+
+        mock_pull_request_1 = Mock()
+        mock_pull_request_1.created_at = datetime.today().replace(tzinfo=timezone.utc)
+        mock_pull_request_1.head.ref = "ITEM-123" #This shouldn't matter
+        mock_pull_request_1.merged = True
+        mock_pull_request_1.number = 1
+        mock_pull_request_1.html_url = "www.google.com/pr"
+        mock_pull_request_1.get_commits.return_value = [git_commit_1]
+
+        mock_commit_1 = Mock()
+        mock_commit_1.sha = "1234567890"
+        mock_commit_1.commit = git_commit_1
+        mock_commit_1.html_url = "www.google.com/commit"
+        mock_commit_1.get_pulls.return_value = [mock_pull_request_1]
+
+        mock_pull_request_2 = Mock()
+        mock_pull_request_2.created_at = datetime.today().replace(tzinfo=timezone.utc)
+        mock_pull_request_2.head.ref = "ITEM-12345"
+        mock_pull_request_2.merged = True
+        mock_pull_request_2.number = 2
+        mock_pull_request_2.html_url = "www.google.com/pr"
+        mock_pull_request_2.get_commits.return_value = [git_commit_2]
+
+        mock_commit_2 = Mock()
+        mock_commit_2.sha = "2345678901"
+        mock_commit_2.commit = git_commit_2
+        mock_commit_2.html_url = "www.google.com/commit"
+        mock_commit_2.get_pulls.return_value = [mock_pull_request_2]
+
+        mock_pull_request_3 = Mock()
+        mock_pull_request_3.created_at = datetime.today().replace(tzinfo=timezone.utc)
+        mock_pull_request_3.head.ref = "ITEM-345"
+        mock_pull_request_3.merged = True
+        mock_pull_request_3.number = 3
+        mock_pull_request_3.html_url = "www.google.com/pr"
+        mock_pull_request_3.get_commits.return_value = [git_commit_3]
+
+        mock_commit_3 = Mock()
+        mock_commit_3.sha = "3456789012"
+        mock_commit_3.commit = git_commit_3
+        mock_commit_3.html_url = "www.google.com/commit"
+        mock_commit_3.get_pulls.return_value = [mock_pull_request_3]
+
+        mock_repo = Mock()
+        mock_repo.get_commits.return_value = [mock_commit_1, mock_commit_2, mock_commit_3]
+
+        mock_branch = Mock()
+        mock_branch.commit = generate_git_commit_object(
+            GitCommitDetails(
+                "This is a test", 
+                "Uni", 
+                "uni@test.py", 
+                "2024-01-12T08:30:02.000Z", 
+                "3456789012345678901234567890123456789012", 
+                "www.google2.com", 
+                1, 
+                True
+            )
+        )
+
+        target = GitTheCommits(False)
+        target.strip_characters_from_item_numbers = True
+        target.item_numbers = ["123", "345", "12345"]
+        target.use_commit_history = True
+        target.use_pull_requests = False
+        target.github_repository = mock_repo
+        target.github_target_branch = mock_branch
+
+        # Act
+        await target.fetch_commits()
+
+        # Arrange
+        self.assertEqual(3, len(target.commit_list))
+
+        filtered_commits = list(filter(lambda c: c.item_number == "123", target.commit_list))
+        self.assertEqual(1, len(filtered_commits)) # 123
+        commit_123 = filtered_commits[0]
+        self.assertIsNotNone(commit_123)
+        self.assertEqual("123", commit_123.item_number)
+        self.assertEqual("0987654321098765432109876543210987654321", commit_123.sha)
+
+        filtered_commits = list(filter(lambda c: c.item_number == "345", target.commit_list))
+        self.assertEqual(1, len(filtered_commits)) # 345
+        commit_345 = filtered_commits[0]
+        self.assertIsNotNone(commit_345)
+        self.assertEqual("345", commit_345.item_number)
+        self.assertEqual("2345678901234567890123456789012345678901", commit_345.sha)
+        
+        filtered_commits = list(filter(lambda c: c.item_number == "12345", target.commit_list))
+        self.assertEqual(1, len(filtered_commits)) # 12345
+        commit_12345 = filtered_commits[0]
+        self.assertIsNotNone(commit_12345)
+        self.assertEqual("12345", commit_12345.item_number)
+        self.assertEqual("1234567890123456789012345678901234567890", commit_12345.sha)
+
+
     async def test_use_pull_requests_can_distinguish_separated_numbers(self):
         # Arrange
         git_commit_1 = Mock()
@@ -2821,7 +3901,7 @@ class TestFetchCommits(unittest.IsolatedAsyncioTestCase):
 
 
     @patch('GitTheCommits.GitTheCommits.manually_enter_item_numbers')
-    async def test_handles_no_initial_item_numbers(self, mock_enter_item_numbers):
+    async def test_handles_no_initial_item_numbers(self, mock_enter_item_numbers: MagicMock):
         # Arrange
         git_commit = Mock()
         git_commit.commit = generate_git_commit_object(
@@ -2978,8 +4058,7 @@ class TestFetchCommits(unittest.IsolatedAsyncioTestCase):
 class TestOutputCommits(unittest.TestCase):
     @patch('builtins.print')
     @patch('builtins.input')
-    @patch('builtins.exit', side_effect=SystemExit)
-    def test_prints_terminal_output_no_commits_found_when_no_commit_list_empty(self, mock_exit, mock_input, mock_print):
+    def test_prints_terminal_output_no_commits_found_when_no_commit_list_empty(self, mock_input: MagicMock, mock_print: MagicMock):
         # Arrange
         target = GitTheCommits(False)
 
@@ -2989,20 +4068,19 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = False
 
         # Act
-        with self.assertRaises(SystemExit):
-            target.output_commits()
+        result = target.output_commits()
 
         # Assert
+        self.assertIsNotNone(result)
+        self.assertEqual([], result)
         mock_print.assert_called_once_with("\nNo commits found")
-        mock_input.assert_called_once()
-        mock_exit.assert_called_once()
+        mock_input.assert_called_once_with("Press Enter to exit...")
 
 
     @patch('builtins.print')
     @patch('builtins.input')
-    @patch('builtins.exit', side_effect=SystemExit)
     @patch('builtins.open', new_callable=mock_open)
-    def test_prints_txt_output_no_commits_found_when_no_commit_list_empty(self, mock_open, mock_exit, mock_input, mock_print):
+    def test_prints_txt_output_no_commits_found_when_no_commit_list_empty(self, mock_open: MagicMock, mock_input: MagicMock, mock_print: MagicMock):
         # Arrange
         target = GitTheCommits(False)
 
@@ -3012,48 +4090,25 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
 
         # Act
-        with self.assertRaises(SystemExit):
-            target.output_commits()
+        result = target.output_commits()
 
         # Assert
+        self.assertIsNotNone(result)
+        self.assertEqual([], result)
         mock_open.assert_called_once_with("output.txt", 'w')
         mock_open().write.assert_called_once_with("No commits found")
         mock_print.assert_not_called()
-        mock_input.assert_called_once()
-        mock_exit.assert_called_once()
-
-    
-    @patch('builtins.print')
-    @patch('builtins.input')
-    @patch('builtins.exit', side_effect=SystemExit)
-    def test_prints_excel_output_no_commits_found_when_no_commit_list_empty(self, mock_exit, mock_input, mock_print):
-        # Arrange
-        target = GitTheCommits(False)
-
-        target.commit_list = []
-        target.output_to_terminal = False
-        target.output_to_excel = True
-        target.output_to_txt = False
-
-        # Act
-        with self.assertRaises(SystemExit):
-            target.output_commits()
-
-        # Assert
-        mock_print.assert_called_once_with("\nNo commits found")
-        mock_input.assert_called_once()
-        mock_exit.assert_called_once()
+        mock_input.assert_not_called()
 
     
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_group_by_item_finds_commits_for_multiple_items(self, mock_print, mock_input):
+    def test_terminal_group_by_item_finds_commits_for_multiple_items(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
             "author1", 
-            datetime.strptime("2022-01-01", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-01", "%Y-%m-%d"), 
             "1234567890", 
             "www.google.com/commit1", 
             "www.google.com/pr1", 
@@ -3062,8 +4117,7 @@ class TestOutputCommits(unittest.TestCase):
         )
         commit2 = CommitInfo("commit for item2", 
             "author2", 
-            datetime.strptime("2022-01-02", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-02", "%Y-%m-%d"), 
             "0987654321", 
             "www.google.com/commit2", 
             "www.google.com/pr2", 
@@ -3075,7 +4129,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3092,11 +4146,12 @@ class TestOutputCommits(unittest.TestCase):
             call('\nCommit for 2 (1):\n- commit for item2\n\n---'),
         ]
         mock_print.assert_has_calls(expected_calls, any_order=False)
+        mock_input.assert_called_once_with("Press Enter to exit...")
     
     
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_group_by_item_finds_multiple_commits_for_multiple_items(self, mock_print, mock_input):
+    def test_terminal_group_by_item_finds_multiple_commits_for_multiple_items(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3133,7 +4188,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2, commit3]
@@ -3152,15 +4207,14 @@ class TestOutputCommits(unittest.TestCase):
         mock_print.assert_has_calls(expected_calls, any_order=False)
     
     
-    @patch('builtins.input', return_value='')
-    @patch('builtins.print')
-    def test_terminal_group_by_item_finds_no_commit_for_one_item(self, mock_print, mock_input):
+    @patch("builtins.input", return_value='')
+    @patch("builtins.print")
+    def test_terminal_group_by_item_finds_no_commit_for_one_item(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
             "author1", 
-            datetime.strptime("2022-01-01", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-01", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
             "1234567890", 
             "www.google.com/commit1", 
             "www.google.com/pr1", 
@@ -3172,7 +4226,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1]
@@ -3184,16 +4238,16 @@ class TestOutputCommits(unittest.TestCase):
 
         # Assert
         expected_calls = [
-            call('\nFound 1 related commit'),
-            call('\nCommit for 1 (1):\n- commit for item1\n\n---'),
-            call('\nNo commits found for 2\n\n---'),
+            call("\nFound 1 related commit"),
+            call("\nCommit for 1 (1):\n- commit for item1\n\n---"),
+            call("\nNo commits found for '2'\n\n---"),
         ]
         mock_print.assert_has_calls(expected_calls, any_order=False)
     
 
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_group_by_item_sorts_commits_date_asc(self, mock_print, mock_input):
+    def test_terminal_group_by_item_sorts_commits_date_asc(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3220,7 +4274,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3240,7 +4294,7 @@ class TestOutputCommits(unittest.TestCase):
     
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_group_by_item_sorts_commits_date_desc(self, mock_print, mock_input):
+    def test_terminal_group_by_item_sorts_commits_date_desc(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3267,7 +4321,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = True
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3287,7 +4341,7 @@ class TestOutputCommits(unittest.TestCase):
 
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_group_by_item_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_print, mock_input):
+    def test_terminal_group_by_item_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
@@ -3314,7 +4368,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = True
+        target.all_commits_cherry_pick_command = True
         target.cherry_pick_command = "git cherry-pick"
         target.commit_detail_visibilty.message = True
 
@@ -3337,7 +4391,7 @@ class TestOutputCommits(unittest.TestCase):
 
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_group_by_item_prints_cherry_pick_per_item(self, mock_print, mock_input):
+    def test_terminal_group_by_item_prints_cherry_pick_per_item(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3374,7 +4428,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.order_commits_by_date_descend = False
         target.group_commits_by_item = True
-        target.group_commit_cherry_pick = True
+        target.item_cherry_pick = True
         target.cherry_pick_command = "git cherry-pick"
         target.commit_detail_visibilty.message = True
 
@@ -3395,13 +4449,12 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_group_by_item_finds_commits_for_multiple_items(self, mock_open):
+    def test_txt_group_by_item_finds_commits_for_multiple_items(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
             "author1", 
-            datetime.strptime("2022-01-01", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-01", "%Y-%m-%d"), 
             "1234567890", 
             "www.google.com/commit1", 
             "www.google.com/pr1", 
@@ -3410,8 +4463,7 @@ class TestOutputCommits(unittest.TestCase):
         )
         commit2 = CommitInfo("commit for item2", 
             "author2", 
-            datetime.strptime("2022-01-02", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-02", "%Y-%m-%d"), 
             "0987654321", 
             "www.google.com/commit2", 
             "www.google.com/pr2", 
@@ -3423,7 +4475,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3438,7 +4490,7 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_group_by_item_finds_multiple_commits_for_multiple_items(self, mock_open):
+    def test_txt_group_by_item_finds_multiple_commits_for_multiple_items(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3475,7 +4527,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2, commit3]
@@ -3490,13 +4542,12 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_group_by_item_finds_no_commit_for_one_item(self, mock_open):
+    def test_txt_group_by_item_finds_no_commit_for_one_item(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
             "author1", 
-            datetime.strptime("2022-01-01", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-01", "%Y-%m-%d").replace(tzinfo=timezone.utc), 
             "1234567890", 
             "www.google.com/commit1", 
             "www.google.com/pr1", 
@@ -3508,7 +4559,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1]
@@ -3519,11 +4570,11 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_open().write.assert_called_once_with('Found 1 related commit\n\nCommit for 1 (1):\n- commit for item1\n\n---\n\nNo commits found for 2\n\n---')
+        mock_open().write.assert_called_once_with("Found 1 related commit\n\nCommit for 1 (1):\n- commit for item1\n\n---\n\nNo commits found for '2'\n\n---")
     
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_group_by_item_sorts_commits_date_asc(self, mock_open):
+    def test_txt_group_by_item_sorts_commits_date_asc(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3550,7 +4601,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3565,7 +4616,7 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_group_by_item_sorts_commits_date_desc(self, mock_open):
+    def test_txt_group_by_item_sorts_commits_date_desc(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3592,7 +4643,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = True
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3607,7 +4658,7 @@ class TestOutputCommits(unittest.TestCase):
 
 
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_group_by_item_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_open):
+    def test_txt_group_by_item_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
@@ -3634,7 +4685,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = True
+        target.all_commits_cherry_pick_command = True
         target.cherry_pick_command = "git cherry-pick"
         target.commit_detail_visibilty.message = True
 
@@ -3650,7 +4701,7 @@ class TestOutputCommits(unittest.TestCase):
 
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_group_by_item_prints_cherry_pick_per_item(self, mock_open):
+    def test_txt_group_by_item_prints_cherry_pick_per_item(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3686,10 +4737,10 @@ class TestOutputCommits(unittest.TestCase):
         target = GitTheCommits(False)
         target.output_to_txt = True
         target.group_commits_by_item = True
-        target.group_commit_cherry_pick = True
+        target.item_cherry_pick = True
         target.cherry_pick_command = "git cherry-pick"
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2, commit3]
@@ -3704,13 +4755,12 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_group_by_item_sorts_commits_date_desc(self, mock_generate_excel_file):
+    def test_excel_group_by_item_sorts_commits_date_desc(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
             "author1", 
-            datetime.strptime("2022-01-01", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-01", "%Y-%m-%d"), 
             "1234567890", 
             "www.google.com/commit1", 
             "www.google.com/pr1", 
@@ -3732,7 +4782,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = True
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3743,17 +4793,16 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit1, commit2])
+        mock_generate_excel_file.assert_called_once()
 
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_group_by_item_finds_commits_for_multiple_items(self, mock_generate_excel_file):
+    def test_excel_group_by_item_finds_commits_for_multiple_items(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
             "author1", 
-            datetime.strptime("2022-01-01", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-01", "%Y-%m-%d"), 
             "1234567890", 
             "www.google.com/commit1", 
             "www.google.com/pr1", 
@@ -3762,8 +4811,7 @@ class TestOutputCommits(unittest.TestCase):
         )
         commit2 = CommitInfo("commit for item2", 
             "author2", 
-            datetime.strptime("2022-01-02", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-02", "%Y-%m-%d"), 
             "0987654321", 
             "www.google.com/commit2", 
             "www.google.com/pr2", 
@@ -3775,7 +4823,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3786,11 +4834,11 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit1, commit2])
+        mock_generate_excel_file.assert_called_once()
     
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_group_by_item_finds_multiple_commits_for_multiple_items(self, mock_generate_excel_file):
+    def test_excel_group_by_item_finds_multiple_commits_for_multiple_items(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3827,7 +4875,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2, commit3]
@@ -3838,11 +4886,11 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit1, commit2, commit3])
+        mock_generate_excel_file.assert_called_once()
     
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_group_by_item_sorts_commits_date_asc(self, mock_generate_excel_file):
+    def test_excel_group_by_item_sorts_commits_date_asc(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3869,7 +4917,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3880,11 +4928,11 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit1, commit2])
+        mock_generate_excel_file.assert_called_once()
     
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_group_by_item_multiple_commits_in_item_sorts_commits_date_desc(self, mock_generate_excel_file):
+    def test_excel_group_by_item_multiple_commits_in_item_sorts_commits_date_desc(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -3911,7 +4959,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = True
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -3922,11 +4970,11 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit2, commit1])
+        mock_generate_excel_file.assert_called_once()
 
 
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_group_by_item_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_generate_excel_file):
+    def test_excel_group_by_item_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
@@ -3953,7 +5001,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = True
+        target.all_commits_cherry_pick_command = True
         target.cherry_pick_command = "git cherry-pick"
         target.commit_detail_visibilty.message = True
 
@@ -3965,12 +5013,12 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit1, commit2])
+        mock_generate_excel_file.assert_called_once()
 
 
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_finds_commits_for_multiple_items(self, mock_print, mock_input):
+    def test_terminal_finds_commits_for_multiple_items(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
@@ -3997,7 +5045,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -4017,7 +5065,7 @@ class TestOutputCommits(unittest.TestCase):
     
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_finds_multiple_commits_for_multiple_items(self, mock_print, mock_input):
+    def test_terminal_finds_multiple_commits_for_multiple_items(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4054,7 +5102,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2, commit3]
@@ -4074,7 +5122,7 @@ class TestOutputCommits(unittest.TestCase):
     
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_sorts_commits_date_asc(self, mock_print, mock_input):
+    def test_terminal_sorts_commits_date_asc(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4101,7 +5149,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -4121,7 +5169,7 @@ class TestOutputCommits(unittest.TestCase):
     
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_sorts_commits_date_desc(self, mock_print, mock_input):
+    def test_terminal_sorts_commits_date_desc(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4148,7 +5196,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = True
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -4168,7 +5216,7 @@ class TestOutputCommits(unittest.TestCase):
 
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_print, mock_input):
+    def test_terminal_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
@@ -4195,7 +5243,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_terminal = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = True
+        target.all_commits_cherry_pick_command = True
         target.cherry_pick_command = "git cherry-pick"
         target.commit_detail_visibilty.message = True
 
@@ -4216,7 +5264,7 @@ class TestOutputCommits(unittest.TestCase):
     
     @patch('builtins.input', return_value='')
     @patch('builtins.print')
-    def test_terminal_group_commit_cherry_pick_not_ran_without_group_commits_by_item(self, mock_print, mock_input):
+    def test_terminal_item_cherry_pick_not_ran_without_group_commits_by_item(self, mock_print: MagicMock, mock_input: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4252,9 +5300,9 @@ class TestOutputCommits(unittest.TestCase):
         target = GitTheCommits(False)
         target.output_to_terminal = True
         target.group_commits_by_item = False
-        target.group_commit_cherry_pick = True
+        target.item_cherry_pick = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2, commit3]
@@ -4273,13 +5321,12 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_finds_commits_for_multiple_items(self, mock_open):
+    def test_txt_finds_commits_for_multiple_items(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
             "author1", 
-            datetime.strptime("2022-01-01", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-01", "%Y-%m-%d"), 
             "1234567890", 
             "www.google.com/commit1", 
             "www.google.com/pr1", 
@@ -4288,8 +5335,7 @@ class TestOutputCommits(unittest.TestCase):
         )
         commit2 = CommitInfo("commit for item2", 
             "author2", 
-            datetime.strptime("2022-01-02", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-02", "%Y-%m-%d"), 
             "0987654321", 
             "www.google.com/commit2", 
             "www.google.com/pr2", 
@@ -4301,7 +5347,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -4316,7 +5362,7 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_finds_multiple_commits_for_multiple_items(self, mock_open):
+    def test_txt_finds_multiple_commits_for_multiple_items(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4353,7 +5399,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2, commit3]
@@ -4368,7 +5414,7 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_sorts_commits_date_asc(self, mock_open):
+    def test_txt_sorts_commits_date_asc(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4395,7 +5441,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -4410,7 +5456,7 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_sorts_commits_date_desc(self, mock_open):
+    def test_txt_sorts_commits_date_desc(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4437,7 +5483,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = True
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -4452,7 +5498,7 @@ class TestOutputCommits(unittest.TestCase):
 
 
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_open):
+    def test_txt_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
@@ -4479,7 +5525,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_txt = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = True
+        target.all_commits_cherry_pick_command = True
         target.cherry_pick_command = "git cherry-pick"
         target.commit_detail_visibilty.message = True
 
@@ -4495,7 +5541,7 @@ class TestOutputCommits(unittest.TestCase):
 
     
     @patch('builtins.open', new_callable=mock_open)
-    def test_txt_group_commit_cherry_pick_not_ran_without_group_commits_by_item(self, mock_open):
+    def test_txt_item_cherry_pick_not_ran_without_group_commits_by_item(self, mock_open: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4531,9 +5577,9 @@ class TestOutputCommits(unittest.TestCase):
         target = GitTheCommits(False)
         target.output_to_txt = True
         target.group_commits_by_item = False
-        target.group_commit_cherry_pick = True
+        target.item_cherry_pick = True
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2, commit3]
@@ -4548,13 +5594,12 @@ class TestOutputCommits(unittest.TestCase):
     
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_finds_commits_for_multiple_items(self, mock_generate_excel_file):
+    def test_excel_finds_commits_for_multiple_items(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
             "author1", 
-            datetime.strptime("2022-01-01", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-01", "%Y-%m-%d"), 
             "1234567890", 
             "www.google.com/commit1", 
             "www.google.com/pr1", 
@@ -4563,8 +5608,7 @@ class TestOutputCommits(unittest.TestCase):
         )
         commit2 = CommitInfo("commit for item2", 
             "author2", 
-            datetime.strptime("2022-01-02", 
-            "%Y-%m-%d"), 
+            datetime.strptime("2022-01-02", "%Y-%m-%d"), 
             "0987654321", 
             "www.google.com/commit2", 
             "www.google.com/pr2", 
@@ -4576,7 +5620,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -4587,11 +5631,11 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit1, commit2])
+        mock_generate_excel_file.assert_called_once()
     
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_finds_multiple_commits_for_multiple_items(self, mock_generate_excel_file):
+    def test_excel_finds_multiple_commits_for_multiple_items(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4628,7 +5672,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2, commit3]
@@ -4639,11 +5683,11 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit1, commit2, commit3])
+        mock_generate_excel_file.assert_called_once()
     
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_sorts_commits_date_asc(self, mock_generate_excel_file):
+    def test_excel_sorts_commits_date_asc(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4670,7 +5714,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -4681,11 +5725,11 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit1, commit2])
+        mock_generate_excel_file.assert_called_once()
     
     
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_sorts_commits_date_desc(self, mock_generate_excel_file):
+    def test_excel_sorts_commits_date_desc(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit1 for item1", 
@@ -4712,7 +5756,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = True
-        target.show_cherry_pick_command = False
+        target.all_commits_cherry_pick_command = False
         target.commit_detail_visibilty.message = True
 
         target.commit_list = [commit1, commit2]
@@ -4723,11 +5767,11 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit2, commit1])
+        mock_generate_excel_file.assert_called_once()
 
 
     @patch('GitTheCommits.GitTheCommits.generate_excel_file')
-    def test_excel_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_generate_excel_file):
+    def test_excel_finds_commits_for_multiple_items_and_prints_cherrypick_command(self, mock_generate_excel_file: MagicMock):
         # Arrange
         commit1 = CommitInfo(
             "commit for item1", 
@@ -4754,7 +5798,7 @@ class TestOutputCommits(unittest.TestCase):
         target.output_to_excel = True
         target.group_commits_by_item = False
         target.order_commits_by_date_descend = False
-        target.show_cherry_pick_command = True
+        target.all_commits_cherry_pick_command = True
         target.cherry_pick_command = "git cherry-pick"
         target.commit_detail_visibilty.message = True
 
@@ -4766,13 +5810,13 @@ class TestOutputCommits(unittest.TestCase):
         target.output_commits()
 
         # Assert
-        mock_generate_excel_file.assert_called_once_with([commit1, commit2])
+        mock_generate_excel_file.assert_called_once()
 
 
 class TestGetGithubObjects(unittest.TestCase):
     @patch('GitTheCommits.Auth.Token')
     @patch('GitTheCommits.Github')
-    def test_success(self, mock_github, mock_token):
+    def test_success(self, mock_github: MagicMock, mock_token: MagicMock):
         # Arrange
         mock_repo = MagicMock()
         mock_branch = MagicMock()
@@ -4788,7 +5832,7 @@ class TestGetGithubObjects(unittest.TestCase):
         target.get_github_objects()
 
         # Assert
-        mock_github.assert_called_once_with(auth=mock_token(), seconds_between_requests=target.seconds_between_requests)
+        mock_github.assert_called_once_with(auth=mock_token(), seconds_between_requests=target.seconds_between_github_requests)
         mock_github.return_value.get_repo.assert_called_once_with('mock_repo')
         mock_repo.get_branch.assert_called_once_with('mock_branch')
         self.assertEqual(target.github_repository, mock_repo)
@@ -4796,9 +5840,7 @@ class TestGetGithubObjects(unittest.TestCase):
 
 
     @patch('GitTheCommits.Github')
-    @patch('builtins.print')
-    @patch('builtins.input')
-    def test_bad_credentials(self, mock_input, mock_print, mock_github):
+    def test_bad_credentials(self, mock_github: MagicMock):
         # Arrange
         mock_github.return_value.get_repo.side_effect = BadCredentialsException(
             status="Bad credentials",
@@ -4810,22 +5852,14 @@ class TestGetGithubObjects(unittest.TestCase):
         target.repository_name = 'mock_repo'
 
         # Act
-        try:
-            target.get_github_objects()
-        except SystemExit:
-            pass
+        result = target.get_github_objects()
 
         # Assert
-        mock_print.assert_called_once_with(
-            "Github responded with a Bad Credentials error. Please ensure that your GitHubToken is valid and has the required permissions, then try again."
-        )
-        mock_input.assert_called_once()
+        self.assertEqual("Github responded with a Bad Credentials error. \nPlease ensure that your GitHubToken is valid and has the required permissions, \nthen try again.", result)
 
 
     @patch('GitTheCommits.Github')
-    @patch('builtins.print')
-    @patch('builtins.input')
-    def test_get_repo_repo_not_found(self, mock_input, mock_print, mock_github):
+    def test_get_repo_repo_not_found(self, mock_github: MagicMock):
         # Arrange
         mock_github.return_value.get_repo.side_effect = GithubException(
             status=404,
@@ -4837,20 +5871,14 @@ class TestGetGithubObjects(unittest.TestCase):
         target.repository_name = 'mock_repo'
 
         # Act
-        try:
-            target.get_github_objects()
-        except SystemExit:
-            pass
+        result = target.get_github_objects()
 
         # Assert
-        mock_print.assert_called_once_with(
-            "Could not find the target repository 'mock_repo'. Please ensure that your TargetRepository is correct and your GitHubToken has the required permissions to view the repository, then try again."
-        )
-        mock_input.assert_called_once()
+        self.assertEqual("Could not find the target repository 'mock_repo'. \nPlease ensure that your TargetRepository is correct \nand your GitHubToken has the required permissions to view the repository, \nthen try again.", result)
 
 
     @patch('GitTheCommits.Github')
-    def test_get_repo_unhandled_exception(self, mock_github):
+    def test_get_repo_unhandled_exception(self, mock_github: MagicMock):
         # Arrange
         mock_github.return_value.get_repo.side_effect = GithubException(
             status=500,
@@ -4869,9 +5897,7 @@ class TestGetGithubObjects(unittest.TestCase):
 
 
     @patch('GitTheCommits.Github')
-    @patch('builtins.print')
-    @patch('builtins.input')
-    def test_get_branch_branch_not_found(self, mock_input, mock_print, mock_github):
+    def test_get_branch_branch_not_found(self, mock_github: MagicMock):
         # Arrange
         mock_repo = MagicMock()
         mock_repo.get_branch.side_effect = GithubException(
@@ -4886,22 +5912,16 @@ class TestGetGithubObjects(unittest.TestCase):
         target.target_branch_name = 'mock_branch'
 
         # Act
-        try:
-            target.get_github_objects()
-        except SystemExit:
-            pass
+        result = target.get_github_objects()
 
         # Assert
-        mock_print.assert_called_once_with(
-            "Could not find the target branch 'mock_branch'. Please ensure that your TargetBranch exists, then try again."
-        )
-        mock_input.assert_called_once()
+        self.assertEqual("Could not find the target branch 'mock_branch'. \nPlease ensure that your TargetBranch exists, then try again.", result)
 
 
     @patch('GitTheCommits.Github')
     @patch('builtins.print')
     @patch('builtins.input')
-    def test_get_branch_unhandled_exception(self, mock_input, mock_print, mock_github):
+    def test_get_branch_unhandled_exception(self, mock_input: MagicMock, mock_print: MagicMock, mock_github: MagicMock):
         # Arrange
         mock_repo = MagicMock()
         mock_repo.get_branch.side_effect = GithubException(

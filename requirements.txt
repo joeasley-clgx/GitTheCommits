@@ -2,3 +2,4 @@ PyGithub
 xlsxwriter
 python-dateutil
 coverage
+customtkinter

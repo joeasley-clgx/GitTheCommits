@@ -18,16 +18,18 @@
         "CherryPickCommand": false
     },
     "GroupCommitsByItem": false,
-    "GroupCommitCherryPick": false,
+    "ItemCherryPick": false,
     "ShowCommitsInDateDescendingOrder": false,
     "UseCommitHistory": false,
     "UsePullRequests": true,
     "OutputToTerminal": true,
     "OutputToTxtFile": true,
     "OutputToExcelFile": true,
-    "ShowCherryPickCommand": true,
+    "AllCommitsCherryPickCommand": true,
     "IgnoreMergeCommits": true,
     "UseShortCommitHash": false,
     "GitCherryPickArguments": "-n --strategy=recursive",
-    "SearchLimitMonths": 2
+    "SearchLimitMonths": 2,
+    "UseConcurrentCommitFetching": false,
+    "SecondsBetweenGithubRequests": 1.5
 }
