@@ -169,7 +169,7 @@ There are many options for displaying the related commits:
    Denotes what arguments to include with the git cherry-pick.
    The default command (`-n --strategy=recursive`) will automatically cherry-pick each commit into the currently checked-out branch as *staged* changes.
    This way you can build and verify the changes, enter your commit message, and push as you please.
-   Obviously, this only takes effect if `AllCommitsCherryPickCommand` is `true`.
+   Obviously, this only takes effect if any of the three `CherryPickCommand` options are `true`.
 12. SearchLimitMonths -
    Limits how far back we search for commits by X month(s).
    This helps speed up the fetch process if you know what time frame your changes were made.
