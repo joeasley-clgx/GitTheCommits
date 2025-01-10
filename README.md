@@ -96,7 +96,7 @@ Once you've finalized your settings, run `main.py`, kick back, relax, grab some 
 # Settings
 
 The setting names below are from the `settings.json` file.
-Note that the GUI will have these settings spelled out, but the explaination still applies.
+Note that the GUI will have these settings spelled out, but the explanation still applies.
 
 Both the GUI and command line will share this same `settings.json` file.
 
@@ -156,8 +156,6 @@ There are many options for displaying the related commits:
    If `true`, writes the output to an excel file.
 7. AllCommitsCherryPickCommand -
    If `true`, writes a git cherry-pick command for all the found commits to any enabled output.
-   The command will automatically cherry-pick each commit into the currently checked-out branch as *staged* changes.
-   This way you can build and verify the changes, enter your commit message, and push as you please.
    (If you get a `fatal: bad revision` error, you need to fetch all remotes: `git fetch --all`)
 8. IgnoreMergeCommits -
    If `true`, excludes any commit with more than one parent commit.
@@ -169,15 +167,17 @@ There are many options for displaying the related commits:
    For repositories with an enormous amount of commits, this probably needs to be `false`.
 10. GitCherryPickArguments -
    Denotes what arguments to include with the git cherry-pick.
+   The default command (`-n --strategy=recursive`) will automatically cherry-pick each commit into the currently checked-out branch as *staged* changes.
+   This way you can build and verify the changes, enter your commit message, and push as you please.
    Obviously, this only takes effect if `AllCommitsCherryPickCommand` is `true`.
-11. SearchLimitMonths -
+12. SearchLimitMonths -
    Limits how far back we search for commits by X month(s).
    This helps speed up the fetch process if you know what time frame your changes were made.
    Value should be an integer or `null`. Examples: `1`, `2`, `3`.
-12. UseConcurrentCommitFetching -
-   If `true`, once the commits or pull requests have been found, asynchronusly process and save each commit.
+13. UseConcurrentCommitFetching -
+   If `true`, once the commits or pull requests have been found, asynchronously process and save each commit.
    This is faster as we send out multiple API requests at a time, but also can trip GitHub's rate limiting/traffic control.
-13. SecondsBetweenGithubRequests -
+14. SecondsBetweenGithubRequests -
    As a rate limiting/traffic control solution, this acts as a delay between requests to GitHub in the event that requests are rejected as 403.
    Said rejection errors will appear in the console, and even when they appear, will automatically retry after 60 seconds.
    Value should be a float or `null`. Examples: `1`, `2.0`, `3.5`.
