@@ -23,18 +23,28 @@ Once set up properly, you just enter your item numbers and run the program.
 
 1. Ensure you have a Python 3 version installed on your machine. 
    (Tool developed with version [3.10.5](https://www.python.org/downloads/release/python-3105/))
-2. PIP install all the packages listed in [requirements.txt](https://github.com/joeasley-clgx/GitTheCommits/blob/main/requirements.txt). 
+2. Create a virualenv to install all the dependencies
+   (`python -m venv .venv`)
+3. Activate the virtualenv
+   - Windows: `.venv\Scripts\Activate`
+   - macOS/Linux: `source .venv/bin/activate`
+4. Deactivate the virtualenv
+   - Windows: `deactivate`
+   - macOS/Linux: `deactivate`
+5. Once the virtual environment is activated, PIP install the packages listed in `requirements.txt`.
    (`pip install -r ./requirements.txt`)
-3. Create a [Personal Access Token](https://github.com/settings/tokens) for this project to use. 
+6. Create a [Personal Access Token](https://github.com/settings/tokens) for this project to use. 
    Ensure that this token has "repo" access, especially if using this tool with a private repository.
 
 # Usage
 
 There are two ways to run this tool, through the command line or through the GUI.
 
-To run via the new GUI, run the `gui.py` file.
+To run via the new GUI, run the `gui.py` file. (`python gui.py`)
 
-To run via the command line, run the `main.py` file in your terminal.
+To run via the command line, run the `main.py` file in your terminal. (`python main.py`)
+
+Note: make sure your virtual environment is active.
 
 ## GUI Instructions
 
